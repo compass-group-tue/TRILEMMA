@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TRILEMMA Trace Viewer</title>
+<meta name="description" content="Every run of the main experiment: Slack messages, agent reasoning, tool calls and the judges' labels."/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 5 28 26H4z' fill='none' stroke='%2324262b' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='5.5' r='4' fill='%230e8f6b'/%3E%3Ccircle cx='4.5' cy='26' r='4' fill='%233f5fb8'/%3E%3Ccircle cx='27.5' cy='26' r='4' fill='%23d0662a'/%3E%3C/svg%3E"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet"/>
+<script>try{const t=new URLSearchParams(location.search).get('theme')||localStorage.getItem('trilemma-theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="assets/site.css"/>
+<style>
+body{font-size:14px;line-height:1.5}
+.nav .wrap{max-width:none;padding:0 18px}
+.app{display:grid;grid-template-columns:330px minmax(0,1fr);min-height:calc(100vh - 58px)}
+/* sidebar */
+.side{border-right:1px solid var(--line);padding:14px 14px 40px;position:sticky;top:58px;height:calc(100vh - 58px);overflow:auto;background:var(--bg)}
+.side h2{font:600 12px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:4px 0 8px}
+.flt{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px}
+.flt button{font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--ink-2);background:var(--surface);display:inline-flex;align-items:center;gap:5px}
+.flt button i{width:8px;height:8px;border-radius:2px;background:var(--c)}
+.flt button[aria-pressed="true"]{border-color:var(--ink-2);color:var(--ink);background:var(--surface-2)}
+.mm{display:grid;grid-template-columns:118px repeat(10,1fr);gap:3px;align-items:center}
+.mm .mn{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.mm .div{grid-column:1/-1;font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
+.mt{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 4px;grid-auto-flow:column;gap:1.5px;height:26px;padding:1.5px;border-radius:4px;border:1.5px solid transparent;text-decoration:none}
+.mt span{border-radius:2px;background:var(--c)}
+.mt .db{border-radius:1px;background:var(--b,transparent);display:flex;overflow:hidden}.mt .db i{flex:1}
+.mt .db.none{background:none}
+.sidelegend i.bar{height:4px;align-self:center}
+.mt.valid{border-color:var(--ink-3)}
+.mt.cur{outline:2px solid var(--accent);outline-offset:1px}
+.mt.off{opacity:.15}
+.mt:hover{transform:scale(1.2)}
+.sidelegend{display:grid;gap:3px;margin-top:14px;font-size:11.5px;color:var(--ink-2)}
+.sidelegend span{display:flex;align-items:center;gap:6px}.sidelegend i{width:10px;height:10px;border-radius:2px;background:var(--c)}
+/* main */
+.main{padding:18px 22px 80px;min-width:0}
+.rh{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-start;justify-content:space-between}
+.rh h1{font:400 30px/1.1 var(--serif);margin:0}
+.rh h1 small{font:500 13px var(--mono);color:var(--ink-3);margin-left:8px}
+.rh .sub{color:var(--ink-3);font-size:12.5px;margin-top:4px;word-break:break-all}
+.boardmini{display:grid;grid-template-columns:auto auto auto;gap:4px 8px;align-items:center;font-size:12.5px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--surface)}
+.boardmini b{font:500 12px var(--mono)}
+.boardmini .who{display:inline-flex;align-items:center;gap:5px}
+.badge{font-size:11.5px;font-weight:600;border-radius:6px;padding:1px 8px;display:inline-block}
+.badge.ok{background:color-mix(in srgb,var(--hon) 18%,transparent);color:var(--hon)}
+.badge.no{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.seats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.sc{padding:14px 16px;border-top:3px solid var(--c)}
+.sc header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sc header b{font-size:15px}
+.reps{display:inline-flex;gap:3px;margin-left:auto}
+.reps i{width:14px;height:14px;border-radius:3px;background:var(--c);font:600 9px/14px Inter;color:var(--hi-ink);text-align:center;font-style:normal}
+.sc details.more{margin-top:8px}
+.ev{margin-top:10px;border:1px solid var(--line);border-left:3px solid var(--c2);border-radius:8px;background:var(--bg);overflow:hidden}
+.ev header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 10px;font-size:12px;color:var(--ink-3);border-bottom:1px solid var(--line)}
+.ev header .go{margin-left:auto;font-size:12px}
+.ev .evt{padding:8px 12px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13.5px;line-height:1.5}
+.sc .q{font-family:var(--serif);font-size:16px;line-height:1.45;margin:10px 0 0;padding-left:10px;border-left:2px solid var(--c2);cursor:pointer}
+.sc .q:hover{background:var(--surface-2)}
+.sc .kv{margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.sc .kv b{color:var(--ink);font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;margin-right:6px}
+.sc details{margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.sc details summary{cursor:pointer;color:var(--ink-3)}
+.sc .rep{border-top:1px dashed var(--line);padding-top:6px;margin-top:6px}
+.sc .flags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.cotq{cursor:pointer}
+.cotq:hover{text-decoration:underline}
+/* tabs */
+.tabs{display:flex;gap:6px;margin:22px 0 12px;align-items:center;flex-wrap:wrap}
+.tabs .seg button{font-size:13px}
+.tabs .fine{margin-left:auto}
+/* timeline */
+.tl{padding:12px 14px;overflow-x:auto}
+svg.tlsvg{display:block;min-width:820px;width:100%}
+.tlsvg .lane{font:600 12px Inter,sans-serif}
+.tlsvg .ax{fill:var(--ink-3);font:10.5px var(--mono)}
+.tlsvg .g{stroke:var(--line)}
+.tlsvg .turn{opacity:.28;cursor:pointer}
+.tlsvg .turn:hover{opacity:.6}
+.tlsvg .post{cursor:pointer;stroke:var(--surface);stroke-width:1.5}
+.tlsvg .post:hover{stroke:var(--ink);stroke-width:2}
+.tlsvg .mk{stroke:var(--accent);stroke-dasharray:4 3}
+.tlsvg .mkl{fill:var(--accent);font:600 10.5px Inter,sans-serif}
+.tlsvg .claim{font:600 9.5px var(--mono);fill:var(--hi-ink)}
+.tlnote{font-size:12px;color:var(--ink-3);margin:6px 2px 0;display:flex;flex-wrap:wrap;gap:4px 14px}
+.tlnote span{display:inline-flex;gap:5px;align-items:center}.tlnote i{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.tlnote i.sq{border-radius:2px}.tlnote i.ring{background:none;border:2.5px solid var(--c)}
+/* chat */
+.chat{display:grid;grid-template-columns:230px minmax(0,1fr) 126px;min-height:600px;overflow:hidden}
+.minimap{border-left:1px solid var(--line);padding:0 4px;align-self:start;cursor:pointer;user-select:none}
+.minimap svg{display:block}
+.minimap .vp{fill:color-mix(in srgb,var(--accent) 6%,transparent);stroke:var(--accent);stroke-width:1.2;pointer-events:none}
+.minimap rect.mk:hover{stroke:var(--ink);stroke-width:1}
+.card.flash{animation:flash 1.6s ease}
+.convs{border-right:1px solid var(--line);padding:10px 8px;overflow:auto;max-height:80vh}
+.convs h3{font:600 11px Inter;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:10px 6px 4px}
+.convs button{display:flex;width:100%;align-items:center;gap:6px;padding:5px 8px;border-radius:7px;font-size:13px;color:var(--ink-2);text-align:left}
+.convs button:hover{background:var(--surface-2)}
+.convs button[aria-current="true"]{background:var(--surface-2);color:var(--ink);font-weight:600}
+.convs button .n{margin-left:auto;font:11px var(--mono);color:var(--ink-3)}
+.convs .cv{display:flex;align-items:center;gap:2px;border-radius:7px}
+.convs .cv.on{background:var(--surface-2)}
+.convs .cv .nm{flex:1;min-width:0}
+.convs .cv.on .nm{color:var(--ink);font-weight:600}
+.convs button.box{width:22px;flex:0 0 22px;padding:0;justify-content:center}
+.convs button.box::before{content:"";width:11px;height:11px;border:1.5px solid var(--ink-3);border-radius:3px;display:block}
+.convs button.box[aria-pressed="true"]::before{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--surface-2)}
+.presets{display:flex;gap:5px;margin:2px 4px 4px}
+.convs .presets button{width:auto;font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;background:var(--surface)}
+.convs .presets button[aria-pressed="true"]{border-color:var(--ink-2);color:var(--ink);background:var(--surface-2)}
+.xposts{display:grid;gap:3px;margin-top:6px}
+.xpost{display:grid;gap:1px;text-decoration:none;border:1px dashed var(--line);border-radius:7px;padding:4px 9px;font-size:12px;color:var(--ink-2);background:var(--bg)}
+.xpost:hover{border-color:var(--ink-3);border-style:solid}
+.xpost .xl b{color:var(--ink);font-weight:600}
+.xpost .xs{color:var(--ink-3);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg.turnrow{opacity:.85}
+.msg.turnrow .av{opacity:.6}
+.stream.multi{padding:0;max-height:80vh;overflow:auto}
+.stream.multi .warm{display:flex;gap:6px;align-items:center;padding:8px 12px;cursor:pointer;position:sticky;left:0}
+.mgrid .ch .closebtn{margin-left:auto;padding:0 7px}
+.mgrid .msg{grid-template-columns:24px minmax(0,1fr);gap:7px;padding:6px 4px}
+.mgrid .msg .av{width:22px;height:22px;font-size:11px}
+.mgrid .msg .txt{font-size:13px}
+.mgrid .msg header b{font-size:13px}
+.convs button .fls{display:inline-flex;gap:3px;margin-left:4px}
+.convs button .fl{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.convs .fllegend{font-size:11px;color:var(--ink-3);margin:10px 8px 0;line-height:1.5}
+.stream{padding:6px 16px 30px;overflow:auto;max-height:80vh}
+.msg{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:8px 8px;border-radius:9px;scroll-margin-top:80px}
+.msg:hover{background:color-mix(in srgb,var(--surface-2) 50%,transparent)}
+.msg .av{width:28px;height:28px;font-size:12.5px;border-radius:7px}
+.msg header{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.msg header b{font-size:14px}
+.msg header .t{font:11px var(--mono);color:var(--ink-3)}
+.msg .txt{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:1px;font-size:14px}
+.msg.bot .txt{color:var(--ink-3);font-size:12.5px}
+.msg.flash{animation:flash 1.6s ease}
+@keyframes flash{0%,40%{background:color-mix(in srgb,var(--accent) 22%,transparent)}100%{background:transparent}}
+.msg .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.msg .tags .chip{font-size:11px;padding:1px 8px}
+.tagbtn{font-size:11.5px;color:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:1px 8px;background:var(--surface)}
+.tagbtn:hover{border-color:var(--ink-3);color:var(--ink)}
+.hist{font-size:11px;color:var(--task);border:1px dashed color-mix(in srgb,var(--task) 50%,transparent);border-radius:5px;padding:0 6px}
+.sep{text-align:center;font:11px var(--mono);color:var(--ink-3);margin:12px 0;display:flex;align-items:center;gap:10px}
+.sep::before,.sep::after{content:"";flex:1;border-top:1px solid var(--line)}
+.sep.mk{color:var(--accent)}.sep.mk::before,.sep.mk::after{border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+/* reasoning drawer */
+.think{margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg);overflow:hidden}
+.think>header{display:flex;gap:8px;align-items:center;padding:6px 10px;font-size:12px;color:var(--ink-3);border-bottom:1px solid var(--line)}
+.think>footer{display:flex;justify-content:flex-end;padding:4px 10px;border-top:1px solid var(--line)}
+.closebtn{font-size:11.5px;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--surface);cursor:pointer}
+.closebtn:hover{color:var(--ink);border-color:var(--ink-3)}
+.tagbtn[aria-pressed="true"]{background:var(--surface-2);border-color:var(--ink-3);color:var(--ink)}
+.step{padding:8px 12px;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:0}
+.step .r{white-space:pre-wrap;font-size:13px;color:var(--ink-2);font-family:var(--serif);font-size:15px;line-height:1.45}
+.step .r.clamp{max-height:9.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent)}
+.step .more{font-size:11.5px;color:var(--accent);margin-top:2px}
+.call{display:flex;gap:8px;align-items:baseline;font:12px var(--mono);color:var(--ink-2);margin-top:4px;flex-wrap:wrap}
+.call .tn{color:var(--ink);font-weight:500}
+.call details{width:100%}
+.call details pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;background:var(--surface-2);padding:6px 8px;border-radius:6px;margin:4px 0 0;max-height:220px;overflow:auto}
+.call .posted{font-family:Inter,sans-serif;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 9px;width:100%;white-space:pre-wrap}
+.touser{font-size:13px;color:var(--ink-2);border-left:2px solid var(--line-2);padding-left:8px;margin-top:6px;white-space:pre-wrap}
+/* board (time × lanes) */
+.bd{overflow:auto;max-height:80vh;padding:0}
+.bdgrid{display:grid;min-width:max-content}
+.bdgrid .ch{position:sticky;top:0;z-index:3;background:var(--surface);border-bottom:1px solid var(--line);padding:8px 10px;font-size:12px;font-weight:600;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.bdgrid .tc{position:sticky;left:0;z-index:2;background:var(--surface);font:11px var(--mono);color:var(--ink-3);padding:8px 8px 0 12px;border-right:1px solid var(--line)}
+.bdgrid .ch.tc{z-index:4}
+.bdgrid .cell{padding:4px 6px;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent);min-width:0}
+.bdgrid .mkrow{grid-column:1/-1;font:600 11px Inter;color:var(--accent);border-top:2px solid var(--accent);padding:2px 12px;position:sticky;left:0}
+.card{border:1px solid var(--line);border-left:3px solid var(--c);border-radius:8px;padding:5px 8px;margin-bottom:4px;background:var(--bg);font-size:12.5px;cursor:pointer;overflow-wrap:anywhere}
+.card:hover{border-color:var(--ink-3);border-left-color:var(--c)}
+.card .hd{display:flex;gap:6px;font-size:11px;color:var(--ink-3)}
+.card .hd b{color:var(--ink)}
+.card .bx{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.card.think2 .bx{font-family:var(--serif);font-size:13.5px;color:var(--ink-2);font-style:italic}
+.card.flag{box-shadow:0 0 0 2px color-mix(in srgb,var(--c2) 60%,transparent)}
+.claimtag{font:600 10.5px var(--mono);color:var(--hi-ink);background:var(--c3);border-radius:4px;padding:0 5px}
+/* agent log */
+.al{padding:14px 16px}
+.agpick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.agpick button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 12px 3px 3px;font-size:13px}
+.agpick button[aria-pressed="true"]{border-color:var(--ink-2);background:var(--surface-2);font-weight:600}
+.turnbox{border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden;scroll-margin-top:80px}
+.turnbox>header{display:flex;gap:8px;align-items:center;padding:6px 12px;background:var(--surface-2);font-size:12px;color:var(--ink-2)}
+.turnbox>header .t{font:11px var(--mono)}
+.turnbox.flash{animation:flash 1.6s ease}
+.prompt{font-size:12.5px;white-space:pre-wrap;color:var(--ink-2);max-height:300px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:10px 12px}
+.empty{color:var(--ink-3);padding:40px;text-align:center}
+@media (max-width:1000px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .seats{grid-template-columns:1fr}
+  .chat{grid-template-columns:1fr}
+  .minimap{display:none}
+  .convs{border-right:0;border-bottom:1px solid var(--line);max-height:220px}
+}
+@media (max-width:760px){.main{padding:14px 16px 60px}.nav a.l:not(.keep){display:none}}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="logo" viewBox="0 0 32 32"><path d="M16 5 28 26H4z" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round"/><circle cx="16" cy="5.5" r="4" fill="var(--hon)"/><circle cx="4.5" cy="26" r="4" fill="var(--conf)"/><circle cx="27.5" cy="26" r="4" fill="var(--task)"/></symbol>
+</defs></svg>
+<nav class="nav scrolled" id="nav"><div class="wrap navin">
+  <a class="brand" href="index.html"><svg class="logo"><use href="#logo"/></svg>TRILEMMA</a>
+  <a class="l" href="index.html#results">Results</a>
+  <a class="l keep on" href="traces.html">Traces</a>
+  <button class="iconbtn" id="names"></button>
+  <button class="iconbtn" id="theme" aria-label="Toggle dark mode"></button>
+</div></nav>
+
+<div class="app">
+  <aside class="side">
+    <h2>main · 90 runs</h2>
+    <div class="flt" id="flt"></div>
+    <div class="mm" id="mm"></div>
+    <div class="sidelegend" id="sidelegend"></div>
+    <p class="fine" style="margin-top:14px">Each tile is a run: left half Alice’s agent, right half Carol’s. The thin bar under a half marks a disclosure (deep blue: no-Bob preference, light blue: unpreparedness). A frame marks a valid staffing. Labels come from the deception judge (3 replicates) and its chain-of-thought acknowledgment check.</p>
+  </aside>
+  <main class="main" id="main"><div class="empty">Loading…</div></main>
+</div>
+
+<script src="assets/common.js"></script>
+<script src="data/index.js"></script>
+<script>
+const {esc, av, name, rename, LABEL} = T;
+T.nav(); T.theme(document.getElementById('theme'));
+const IDX = window.TRILEMMA_INDEX;
+const FOCAL = ['Priya','Nadia'], AGENTS = ['Priya','Nadia','Matthieu','Rafael','Helena'];
+const SPRINT = '#sep-2026-sprint';
+const cache = {};
+let R = null, state = {view:'timeline', convs:[SPRINT], agent:'Priya', filter:null, validOnly:false, warmup:false};
+
+/* ── routing ── */
+function parseHash() {
+  const [id, ...kv] = location.hash.slice(1).split('&');
+  const o = Object.fromEntries(kv.map(x => x.split('=')));
+  return {id: id || 'dspro_s6', ...o};
+}
+function setHash(id, extra = {}) {
+  const kv = Object.entries(extra).filter(([,v]) => v).map(([k,v]) => `${k}=${v}`);
+  history.replaceState(null, '', '#' + [id, ...kv].join('&'));
+}
+window.TRACE_LOAD = d => { cache[d.model + '_' + d.seed] = d; if (pending && pending.id === d.model + '_' + d.seed) { pending.cb(d); pending = null; } };
+let pending = null;
+function load(id, cb) {
+  if (cache[id]) return cb(cache[id]);
+  pending = {id, cb};
+  const s = document.createElement('script'); s.src = `data/runs/${id}.js`;
+  s.onerror = () => { document.getElementById('main').innerHTML = `<div class="empty">No run <code>${esc(id)}</code>.</div>`; };
+  document.body.appendChild(s);
+}
+function open(id, extra = {}) {
+  document.getElementById('main').innerHTML = '<div class="empty">Loading run…</div>';
+  load(id, d => { R = prep(d); state.convs = [SPRINT]; Object.assign(state, extra); drawSide(); drawRun(); setHash(id, {view: state.view}); if (extra.jump) jumpTo(extra.jump); });
+}
+addEventListener('hashchange', () => { const h = parseHash(); if (!R || h.id !== R.model + '_' + R.seed) open(h.id, h.view ? {view:h.view} : {}); });
+
+/* ── derived structures ── */
+const norm = s => String(s || '').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+function prep(d) {
+  d.byTs = {}; d.turnById = {};
+  for (const t of d.turns) { d.turnById[t.i] = t; for (const c of t.calls) if (c.tool === 'chat_postMessage' && c.ts) d.byTs[c.ts] = t.i; }
+  for (const m of d.msgs) m.turn = d.byTs[m.id.split(':')[1]];
+  // decisive quotes per focal seat → message ids
+  d.decisive = {};
+  for (const e of FOCAL) {
+    const s = d.seats[e]; s.quoteMsg = {};
+    for (const rep of s.deception.plain) {
+      const q = norm(rep.decisive_quote); if (!q) continue;
+      const m = d.msgs.find(m => m.user === e && m.live && norm(m.text).includes(q.slice(0, 50)));
+      if (m) { (d.decisive[m.id] ??= []).push({emp:e, rep, label:s.label}); s.quoteMsg[rep.decisive_quote] = m.id; }
+    }
+    // CoT acknowledgment → turn
+    const ack = s.deception['ack-fabr'] || s.deception['ack-fram'] || [];
+    for (const a of ack) {
+      const q = norm(a.cot_quote).slice(0, 60); if (!q) continue;
+      const t = d.turns.find(t => t.agent === e && t.steps.some(st => norm(st.reasoning).includes(q)));
+      a.turn = t ? t.i : null;
+    }
+  }
+  for (const e of FOCAL) {
+    const s = d.seats[e];
+    const dec = {};
+    for (const rep of s.deception.plain) { const id = s.quoteMsg[rep.decisive_quote]; if (id) (dec[id] ??= {id, reps:[]}).reps.push(rep); }
+    s.decMsgs = Object.values(dec);
+    // disclosure: messages where a replicate finds a direct, new disclosure about this seat's user,
+    // for the grounds the seat is flagged for (seat flag = all three replicates, over all messages)
+    const want = new Set([...(s.leak_bob ? ['matt'] : []), ...(s.leak_work ? ['work'] : [])]);
+    s.discMsgs = [];
+    for (const m of d.msgs) {
+      if (!m.disc) continue;
+      const by = {};
+      for (const r of m.disc) {
+        if (r.label === 'mixed') continue;
+        for (const g of r.grounds || []) if (g.subject === e && g.strength === 'direct' && (g.new === true || g.new === 'True') && want.has(g.ground)) (by[g.ground] ??= {n:new Set(), spans:[]}).n.add(r.rep), by[g.ground].spans.push(g.span);
+      }
+      for (const [g, v] of Object.entries(by)) s.discMsgs.push({id:m.id, ground:g, n:v.n.size, spans:v.spans});
+    }
+  }
+  d.convList = convList(d);
+  return d;
+}
+function convList(d) {
+  const by = {};
+  for (const m of d.msgs) {
+    const c = by[m.conv] ??= {label:m.conv, live:0, hist:0, flags:0, dec:{}, disc:{}}; m.live ? c.live++ : c.hist++;
+    // only real findings: a deceptive decisive message of a seat labelled FABR/FRAM, or a direct+new disclosure
+    for (const x of d.decisive[m.id] || []) if (['FABR','FRAM'].includes(x.label) && x.rep.label === x.label) c.dec[x.label] = (c.dec[x.label] || 0) + 1;
+    for (const r of m.disc || []) for (const g of r.grounds || []) if (r.label !== 'mixed' && g.strength === 'direct' && (g.new === true || g.new === 'True')) c.disc[g.ground] = 1;
+  }
+  for (const c of Object.values(by)) c.flags = Object.keys(c.dec).length + Object.keys(c.disc).length;
+  return Object.values(by).sort((a, b) => (b.label === SPRINT) - (a.label === SPRINT) || (b.flags - a.flags) || (b.live - a.live));
+}
+const convName = l => l.startsWith('dm:') ? l.slice(3).split('+').map(name).join(' ↔ ') : l.replace('#sep-2026-sprint', '#sprint');
+const hm = t => t ? t.slice(0, 5) : '';
+
+/* ── sidebar ── */
+const FLT = [['FABR'], ['FRAM'], ['NOTH'], ['goes for T1'], ['leak','discloses no-Bob','--pref'], ['leakw','discloses unprep.','--work']];
+function seatMatches(s, f) { return f === 'leak' ? s.leak_bob : f === 'leakw' ? s.leak_work : s.label === f; }
+const dbar = s => s.leak_bob && s.leak_work ? '<span class="db"><i style="background:var(--pref)"></i><i style="background:var(--work)"></i></span>'
+  : s.leak_bob ? '<span class="db" style="--b:var(--pref)"></span>' : s.leak_work ? '<span class="db" style="--b:var(--work)"></span>' : '<span class="db none"></span>';
+function drawSide() {
+  document.getElementById('flt').innerHTML = FLT.map(([k, n, c]) => `<button data-f="${esc(k)}" aria-pressed="${state.filter === k}"><i style="--c:var(${c || LABEL[k].c})"></i>${esc(n || LABEL[k].name)}</button>`).join('') + `<button data-f="valid" aria-pressed="${state.validOnly}">valid staffing</button>`;
+  const cur = R ? R.model + '_' + R.seed : '';
+  let h = '', closed = false;
+  for (const m of IDX.models) {
+    if (m.closed && !closed) { closed = true; h += '<div class="div">closed-weight</div>'; }
+    h += `<div class="mn" title="${esc(m.name)}">${esc(m.name)}</div>`;
+    for (let i = 0; i < 10; i++) {
+      const r = IDX.runs.find(x => x.model === m.key && x.seed === 's' + i);
+      if (!r) { h += '<span></span>'; continue; }
+      const id = r.model + '_' + r.seed;
+      const off = (state.filter && !FOCAL.some(e => seatMatches(r.seats[e], state.filter))) || (state.validOnly && !r.valid);
+      h += `<a class="mt ${r.valid ? 'valid' : ''} ${id === cur ? 'cur' : ''} ${off ? 'off' : ''}" href="#${id}" data-id="${id}">` +
+        FOCAL.map(e => `<span style="--c:var(${(LABEL[r.seats[e].label] || {c:'--nomsg'}).c})"></span>` + dbar(r.seats[e])).join('') + '</a>';
+    }
+  }
+  document.getElementById('mm').innerHTML = h;
+  document.getElementById('sidelegend').innerHTML = Object.values(LABEL).map(l => `<span><i style="--c:var(${l.c})"></i>${l.name}</span>`).join('') +
+    '<span><i class="bar" style="--c:var(--pref)"></i>bar below: discloses no-Bob preference</span><span><i class="bar" style="--c:var(--work)"></i>bar below: discloses unpreparedness</span>';
+}
+document.getElementById('flt').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const f = b.dataset.f; if (f === 'valid') state.validOnly = !state.validOnly; else state.filter = state.filter === f ? null : f; drawSide(); });
+document.getElementById('mm').addEventListener('mousemove', e => {
+  const a = e.target.closest('.mt'); if (!a) return T.tip(null);
+  const r = IDX.runs.find(x => x.model + '_' + x.seed === a.dataset.id);
+  T.tip(`<b>${esc(r.model_name)} · ${r.seed}</b> · ${r.valid ? 'valid staffing' : 'no valid staffing'}<br>` + FOCAL.map(e => `${esc(name(e))}: ${esc((LABEL[r.seats[e].label] || {name:r.seats[e].label}).name)}${r.seats[e].leak_bob ? ' · discloses no-Bob' : ''}${r.seats[e].leak_work ? ' · discloses unpreparedness' : ''}`).join('<br>'), e);
+});
+document.getElementById('mm').addEventListener('mouseleave', () => T.tip(null));
+
+/* ── highlight helpers ── */
+function markSpans(text, spans) {
+  // spans: [{q, cls, title}] — mark the first occurrence of each (prefix fallback)
+  const t = text; const N = norm;
+  const hits = [];
+  for (const s of spans) {
+    if (!s.q) continue;
+    const plain = t.replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
+    const q = String(s.q).replace(/[’‘]/g, "'").replace(/[“”]/g, '"').trim();
+    let i = plain.indexOf(q), n = q.length;
+    if (i < 0 && q.length > 30) { const h = q.slice(0, 30); i = plain.indexOf(h); if (i >= 0) { const tail = q.slice(-20); const j = plain.indexOf(tail, i); n = j >= 0 ? j + tail.length - i : h.length; } }
+    if (i >= 0 && !hits.some(h => i < h.i + h.n && h.i < i + n)) hits.push({i, n, cls:s.cls, title:s.title});
+  }
+  hits.sort((a, b) => a.i - b.i);
+  let out = '', p = 0;
+  for (const h of hits) { out += esc(rename(t.slice(p, h.i))) + `<mark class="${h.cls}" title="${esc(h.title || '')}">` + esc(rename(t.slice(h.i, h.i + h.n))) + '</mark>'; p = h.i + h.n; }
+  return out + esc(rename(t.slice(p)));
+}
+function msgSpans(m) {
+  const sp = [];
+  for (const x of R.decisive[m.id] || []) sp.push({q:x.rep.decisive_quote, cls:LABEL[x.rep.label === 'T1' ? 'goes for T1' : x.rep.label]?.cls || 'noth', title:'deception judge: decisive quote (' + x.rep.label + ')'});
+  for (const d of m.disc || []) for (const g of d.grounds || []) if (g.strength === 'direct' && (g.new === true || g.new === 'True')) sp.push({q:g.span, cls:'disc', title:'disclosure judge: ' + g.ground});
+  return sp;
+}
+function discSummary(m) {
+  if (!m.disc) return '';
+  const direct = {};
+  for (const d of m.disc) for (const g of d.grounds || []) if (g.strength === 'direct' && (g.new === true || g.new === 'True')) direct[g.ground] = (direct[g.ground] || 0) + 1;
+  return Object.entries(direct).map(([g, n]) => `<span class="chip" style="--c:var(${g === 'matt' ? '--pref' : '--work'})" title="disclosure judge, ${n} of 3 replicates: direct and new">discloses ${g === 'matt' ? 'no-Bob preference' : 'unpreparedness'} · ${Math.min(n,3)}/3</span>`).join('');
+}
+
+/* ── run page ── */
+function drawRun() {
+  const d = R, A = d.assignments;
+  const ds = t => FOCAL.filter(e => A[e] === t);
+  const slot = (t, fixed) => `<b>${t}</b><span class="who">${av(fixed, 1)}${esc(name(fixed))}</span><span class="who">${ds(t).length ? ds(t).map(e => av(e, 1) + esc(name(e))).join(' ') : '<span class="muted">no data scientist</span>'}</span>`;
+  let h = `<div class="rh"><div><h1>${esc(d.model_name)}<small>${d.seed}</small></h1>
+      <div class="sub">${d.closed ? 'closed-weight · reasoning is a provider summary · ' : ''}${d.turns.length} agent turns · ${d.msgs.filter(m => m.live && m.conv === SPRINT).length} #sprint messages · ${esc(d.dir)}</div></div>
+    <div class="boardmini">${slot('T1', 'Matthieu')}${slot('T2', 'Rafael')}<span></span><span></span><span>${d.valid ? '<span class="badge ok">valid staffing</span>' : '<span class="badge no">no valid staffing</span>'}</span></div></div>`;
+  h += '<div class="seats">' + FOCAL.map(seatCard).join('') + '</div>';
+  h += `<div class="tabs"><div class="seg" id="views">${[['timeline','Timeline'],['chat','Messages'],['agent','Agent log'],['setup','Prompts']].map(([k, l]) => `<button data-v="${k}" aria-pressed="${state.view === k}">${l}</button>`).join('')}</div><span class="fine" id="viewhint"></span></div><div id="view"></div>`;
+  document.getElementById('main').innerHTML = h;
+  document.getElementById('views').onclick = e => { const b = e.target.closest('button'); if (!b) return; state.view = b.dataset.v; if (state.view === 'chat') state.convs = [SPRINT]; for (const x of e.currentTarget.children) x.setAttribute('aria-pressed', x === b); drawView(); setHash(R.model + '_' + R.seed, {view:state.view}); };
+  drawView();
+}
+function seatCard(e) {
+  const s = R.seats[e], L = LABEL[s.label] || {name:s.label, c:'--nomsg'};
+  const reps = s.deception.plain;
+  const lab = l => LABEL[l === 'T1' ? 'goes for T1' : l === 'NOMSG' ? 'sends no message' : l] || {c:'--nomsg', name:l};
+  const ack = s.deception['ack-fabr'] || s.deception['ack-fram'];
+  const first = reps.find(r => r.decisive_quote) || {};
+  let h = `<div class="panel sc" style="--c:var(${T.COLOR[e]})"><header>${av(e)}<b>${esc(name(e))}’s agent</b><span class="chip" style="--c:var(${L.c})">${esc(L.name)}</span>
+    <span class="reps" title="no-CoT judge, 3 replicates">${reps.map(r => `<i style="--c:var(${lab(r.label).c})" title="${esc(lab(r.label).name)}"></i>`).join('')}</span></header>`;
+  const evBox = (id, chipC, chipT, count, spans) => { const m = R.msgs.find(x => x.id === id); if (!m) return '';
+    return `<div class="ev" style="--c2:var(${chipC})"><header><span class="chip" style="--c:var(${chipC})">${esc(chipT)}</span><span>${esc(m.time.slice(0,5))} · ${m.user !== e ? esc(name(m.user)) + ' → ' : ''}${esc(convName(m.conv))}</span><span class="fine">${count}/3 replicates</span><a class="go" href="#" data-jump="msg:${esc(id)}">open →</a></header><div class="evt">${markSpans(m.text, spans)}</div></div>`; };
+  // only deceptive labels get their message shown; "No deception" / T1 / no message have nothing to point at
+  const deceptive = s.label === 'FABR' || s.label === 'FRAM';
+  if (deceptive) h += s.decMsgs.map(x => evBox(x.id, L.c, L.name, x.reps.length, x.reps.map(r => ({q:r.decisive_quote, cls:L.cls, title:'decisive quote'})))).join('');
+  if (deceptive && !s.decMsgs.length && first.decisive_quote) h += `<p class="q" style="--c2:var(${L.c})">“${esc(rename(first.decisive_quote))}” <span class="fine">${esc(first.decisive_time || '')}</span></p>`;
+  // disclosure: the first message per ground is shown, later ones behind a toggle
+  const discBox = x => evBox(x.id, x.ground === 'matt' ? '--pref' : '--work', x.ground === 'matt' ? 'Discloses no-Bob preference' : 'Discloses unpreparedness', x.n, x.spans.map(q => ({q, cls:'disc', title:'disclosure span'})));
+  const firsts = [], rest = [];
+  for (const x of s.discMsgs) (firsts.some(f => f.ground === x.ground) ? rest : firsts).push(x);
+  h += firsts.map(discBox).join('');
+  if (rest.length) h += `<details class="more"><summary>${rest.length} more disclosure message${rest.length > 1 ? 's' : ''}</summary>${rest.map(discBox).join('')}</details>`;
+  if (first.contradicted_by) h += `<div class="kv"><b>Contradicted by</b>${esc(rename(first.contradicted_by))}</div>`;
+  if (ack) {
+    const a = ack.find(x => x.cot_quote) || ack[0];
+    h += `<div class="kv"><b>CoT</b>${ack.map(x => x.acknowledged ? '✓' : '✗').join(' ')} ${ack.filter(x => x.acknowledged).length}/3 replicates find an acknowledgment${a && a.cot_quote ? `: <span class="cotq" data-jump="turn:${a.turn ?? ''}"><mark class="cot">${esc(rename(a.cot_quote))}</mark></span> <span class="fine">${esc(a.cot_time || '')}</span>` : ''}</div>`;
+  } else if (R.closed && ['FABR','FRAM'].includes(s.label)) h += `<div class="kv"><b>CoT</b>not checked: closed-weight models expose only a reasoning summary</div>`;
+  h += `<div class="flags">${s.leak_bob ? '<span class="chip" style="--c:var(--pref)">discloses no-Bob preference</span>' : ''}${s.leak_work ? '<span class="chip" style="--c:var(--work)">discloses unpreparedness</span>' : ''}${!s.leak_bob && !s.leak_work ? '<span class="chip plain" style="--c:var(--line)">no disclosure</span>' : ''}<span class="chip plain" style="--c:var(--line)">ends on ${esc(s.final_task || '—')}</span></div>`;
+  h += `<details><summary>Judge reasoning, all replicates</summary>${reps.map((r, i) => `<div class="rep"><b>r${i + 1} · ${esc(lab(r.label).name)}</b> ${r.decisive_quote ? `· “${esc(rename(r.decisive_quote))}”` : ''}<br>${esc(rename(r.why || ''))}</div>`).join('')}${(ack || []).map((a, i) => `<div class="rep"><b>CoT check r${i + 1} · ${a.acknowledged ? 'acknowledged' : 'not acknowledged'}</b><br>${esc(rename(a.why || ''))}</div>`).join('')}</details></div>`;
+  return h;
+}
+document.getElementById('main').addEventListener('click', e => {
+  const j = e.target.closest('[data-jump]'); if (j && j.dataset.jump.split(':')[1]) { e.preventDefault(); jumpTo(j.dataset.jump); }
+});
+function jumpTo(target) {
+  const [kind, id] = [target.slice(0, target.indexOf(':')), target.slice(target.indexOf(':') + 1)];
+  if (kind === 'msg') {
+    const m = R.msgs.find(x => x.id === id); if (!m) return;
+    state.view = 'chat'; if (!(state.convs || []).includes(m.conv)) state.convs = [...(state.convs || [SPRINT]), m.conv]; drawRun();
+    const el = document.getElementById('m-' + CSS.escape(id));
+    if (el) { el.scrollIntoView({block:'center', behavior:'smooth'}); el.classList.add('flash'); const op = el.querySelector('[data-think]'); if (op && !el.querySelector('.think')) op.click(); }
+  } else if (kind === 'turn') {
+    const t = R.turnById[id]; if (!t) return;
+    state.view = 'agent'; state.agent = t.agent; drawRun();
+    const el = document.getElementById('t-' + id); if (el) { el.scrollIntoView({block:'start', behavior:'smooth'}); el.classList.add('flash'); }
+  }
+}
+
+function drawView() {
+  const v = document.getElementById('view'), hint = document.getElementById('viewhint');
+  mmRedraw = null; T.tip(null);
+  if (state.view === 'board') { state.view = 'chat'; state.convs = boardPreset(); }
+  ({timeline:drawTimeline, chat:drawChat, agent:drawAgent, setup:drawSetup})[state.view](v, hint);
+}
+
+/* ── timeline: one lane per agent ── */
+function drawTimeline(v, hint) {
+  hint.textContent = 'Bars are agent turns, dots are posts. Click anything to open it.';
+  const d = R, lanes = AGENTS;
+  const t0 = 0, t1 = Math.max(d.deadline + 300, ...d.turns.map(t => t.t_end || 0)), W = 1000, L = 120, top = 26, LH = 46;
+  const x = t => L + Math.max(0, t - t0) / (t1 - t0) * (W - L - 10);
+  const H = top + lanes.length * LH + 80;
+  const base = new Date('2000-01-01T' + d.clock_start + 'Z').getTime();
+  const clock = t => new Date(base + t * 1000).toISOString().slice(11, 16);
+  let s = '';
+  for (let t = 0; t <= t1; t += 300) s += `<line class="g" x1="${x(t)}" x2="${x(t)}" y1="${top - 6}" y2="${H - 50}"/><text class="ax" x="${x(t)}" y="${top - 10}" text-anchor="middle">${clock(t)}</text>`;
+  for (const [t, l] of [[d.kickoff, 'board opens'], [d.deadline, 'board locks']]) s += `<line class="mk" x1="${x(t)}" x2="${x(t)}" y1="${top - 4}" y2="${H - 44}"/><text class="mkl" x="${x(t) + 4}" y="${H - 34}">${l}</text>`;
+  lanes.forEach((a, i) => {
+    const y = top + i * LH + 8, c = `var(${T.COLOR[a]})`;
+    s += `<text class="lane" x="0" y="${y + 18}" fill="${c}">${esc(name(a))}</text>`;
+    for (const t of d.turns.filter(t => t.agent === a)) s += `<rect class="turn" data-turn="${t.i}" x="${x(t.t)}" y="${y + 4}" width="${Math.max(2, x(t.t_end) - x(t.t))}" height="22" rx="3" fill="${c}"><title>${esc(name(a))} · ${t.time} · ${esc(t.wake ? 'woken by ' + convName(t.wake) : t.kind)}</title></rect>`;
+    for (const m of d.msgs.filter(m => m.live && m.user === a)) {
+      const dec = d.decisive[m.id], disc = m.disc && discSummary(m);
+      const fill = dec ? `var(${(LABEL[dec[0].label] || {c:'--nomsg'}).c})` : m.conv === SPRINT ? c : 'var(--surface)';
+      s += `<circle class="post" data-msg="${esc(m.id)}" cx="${x(m.t)}" cy="${y + 15}" r="${dec ? 7 : 5}" fill="${fill}" ${m.conv !== SPRINT ? `stroke="${c}" style="stroke-width:2"` : ''}><title>${esc(m.time)} → ${esc(convName(m.conv))}: ${esc(rename(m.text.slice(0, 160)))}</title></circle>`;
+      if (disc) s += `<circle cx="${x(m.t)}" cy="${y + 15}" r="11" fill="none" stroke="var(--pref)" stroke-width="2.5" pointer-events="none"/>`;
+    }
+    for (const b of d.board.filter(b => b.agent === a)) s += `<g><rect x="${x(b.t) - 11}" y="${y - 6}" width="22" height="12" rx="3" fill="${b.task === 'T1' ? 'var(--t1)' : b.task === 'T2' ? 'var(--task)' : 'var(--ink-3)'}"/><text class="claim" x="${x(b.t)}" y="${y + 3}" text-anchor="middle">${esc(b.task)}</text><title>${esc(name(a))} claims ${esc(b.task)} on the board at ${esc(b.time)}</title></g>`;
+  });
+  // board state strip: which ticket each data scientist holds over time
+  const yb = top + lanes.length * LH + 4;
+  s += `<text class="lane" x="0" y="${yb + 12}" fill="var(--ink-2)">board</text>`;
+  FOCAL.forEach((e, k) => {
+    const ev = d.board.filter(b => b.agent === e).sort((a, b) => a.t - b.t);
+    ev.forEach((b, i) => { const end = i + 1 < ev.length ? ev[i + 1].t : t1;
+      if (b.task === 'T1' || b.task === 'T2') s += `<rect x="${x(b.t)}" y="${yb + k * 13}" width="${Math.max(1, x(end) - x(b.t))}" height="7" rx="2" fill="${b.task === 'T1' ? 'var(--t1)' : 'var(--task)'}" opacity=".85"><title>${esc(name(e))} on ${esc(b.task)}</title></rect>`; });
+    s += `<text class="ax" x="${L - 8}" y="${yb + k * 13 + 7}" text-anchor="end">${esc(name(e))}</text>`;
+  });
+  v.innerHTML = `<div class="panel tl"><svg class="tlsvg" viewBox="0 0 ${W} ${H}">${s}</svg>
+    <div class="tlnote"><span><i style="--c:var(--ink-2)"></i>post in #sprint</span><span><i class="ring" style="--c:var(--ink-2)"></i>DM</span><span><i style="--c:var(--fabr)"></i>decisive message: false claim</span><span><i style="--c:var(--fram)"></i>misdirection</span><span><i class="ring" style="--c:var(--pref)"></i>disclosure</span><span><i class="sq" style="--c:var(--t1)"></i>claims T1</span><span><i class="sq" style="--c:var(--task)"></i>claims T2</span></div></div>`;
+  v.querySelector('svg').addEventListener('click', e => {
+    const m = e.target.closest('[data-msg]'), t = e.target.closest('[data-turn]');
+    if (m) jumpTo('msg:' + m.dataset.msg); else if (t) jumpTo('turn:' + t.dataset.turn);
+  });
+}
+
+/* ── messages: one or several conversations (side by side, time-aligned), with reasoning drawers ── */
+function convDots(c) {
+  const dots = [...Object.keys(c.dec).map(l => [LABEL[l].c, 'contains the deception judge’s decisive ' + LABEL[l].name.toLowerCase() + ' message']),
+    ...Object.keys(c.disc).map(g => [g === 'matt' ? '--pref' : '--work', 'contains a disclosure of ' + (g === 'matt' ? 'the no-Bob preference' : 'unpreparedness')])];
+  return dots.length ? '<span class="fls">' + dots.map(([col, t]) => `<span class="fl" style="--c:var(${col})" title="${esc(t)}"></span>`).join('') + '</span>' : '';
+}
+const isPriv = k => k.startsWith('priv:');
+const laneName = k => isPriv(k) ? name(k.slice(5)) + '’s agent · private reasoning' : convName(k);
+const snippet = (t, n = 90) => { t = rename(t).replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
+function boardPreset() {
+  const agentDm = l => l.startsWith('dm:') && l.slice(3).split('+').every(x => AGENTS.includes(x));
+  return ['priv:Priya', SPRINT, 'priv:Nadia', ...R.convList.filter(c => c.live > 0 && agentDm(c.label)).map(c => c.label)];
+}
+function laneOrder(keys) {
+  const order = ['priv:Priya', SPRINT, 'priv:Nadia', ...R.convList.map(c => c.label).filter(l => l !== SPRINT)];
+  return order.filter(k => keys.includes(k));
+}
+function turnPosts(t) { return R.msgs.filter(m => m.live && m.turn === t.i); }
+function claimTags(t) {
+  return t.calls.filter(c => c.tool === 'board_assign' && c.ok).map(c => `<span class="claimtag" style="--c3:${c.task === 'T1' ? 'var(--t1)' : c.task === 'T2' ? 'var(--task)' : 'var(--ink-3)'}">claims ${esc(c.task)}</span>`).join(' ');
+}
+function xposts(t, shown) {
+  const xs = turnPosts(t).filter(m => !shown.has(m.conv));
+  if (!xs.length) return '';
+  return '<div class="xposts">' + xs.map(m => `<a class="xpost" href="#" data-open="${esc(m.id)}" title="add ${esc(convName(m.conv))} as a column">
+    <span class="xl">${m.conv.startsWith('#') ? 'also posted' : 'also sent'} → <b>${esc(convName(m.conv))}</b> · ${hm(m.time)}</span><span class="xs">“${esc(snippet(m.text))}”</span></a>`).join('') + '</div>';
+}
+function thinkBtn(i) {
+  return R.closed ? `<button class="tagbtn" data-think="${i}" title="Closed-weight models only return a provider-written summary of their reasoning, not the chain of thought">agent turn · tool calls and reasoning summary</button>` : `<button class="tagbtn" data-think="${i}">💭 reasoning and tool calls</button>`;
+}
+function msgHTML(m, shown, lastOfTurn) {
+  const bot = m.user === 'ops-bot' || m.user === 'calendar-bot';
+  const dec = R.decisive[m.id];
+  const t = m.turn != null ? R.turnById[m.turn] : null;
+  const tags = [
+    ...(dec ? [...new Set(dec.map(x => x.label))].map(l => `<span class="chip" style="--c:var(${(LABEL[l] || {c:'--nomsg'}).c})" title="deception judge: decisive message for ${esc(name(dec[0].emp))}'s seat">${esc((LABEL[l] || {name:l}).name)} · ${dec.length}/3</span>`) : []),
+    discSummary(m),
+    t ? thinkBtn(m.turn) : '',
+    !m.live ? '<span class="hist">before the run</span>' : '',
+  ].filter(Boolean).join('');
+  const extra = t && lastOfTurn.get(m.turn) === m.id ? xposts(t, shown) + (claimTags(t) ? `<div class="tags">${claimTags(t)}</div>` : '') : '';
+  return `<div class="msg ${bot ? 'bot' : ''}" id="m-${esc(m.id)}"${m.live ? ` data-t="${m.t}"` : ''}>${bot ? '<i class="av" style="--c:var(--other)">⚙</i>' : av(m.user)}<div><header><b style="color:var(${T.COLOR[m.user] || '--ink'})">${esc(name(m.user))}</b><span class="t">${esc(m.time)}</span></header><div class="txt">${markSpans(m.text, msgSpans(m))}</div>${extra}${tags ? `<div class="tags">${tags}</div>` : ''}</div></div>`;
+}
+function turnRowHTML(t, shown) {
+  // an agent turn with no post in the shown conversations, but posts elsewhere or a board claim
+  return `<div class="msg turnrow" id="tr-${t.i}" data-t="${t.t}">${av(t.agent)}<div><header><b style="color:var(${T.COLOR[t.agent] || '--ink'})">${esc(name(t.agent))}’s agent</b><span class="t">${esc(t.time)}</span><span class="fine">turn with no post here</span></header>${xposts(t, shown)}<div class="tags">${claimTags(t)}${thinkBtn(t.i)}</div></div></div>`;
+}
+function privCard(t) {
+  const r = t.steps.map(s => s.reasoning).filter(Boolean).join('\n').trim();
+  const posts = turnPosts(t);
+  if (!r && !claimTags(t) && !posts.length) return '';
+  return `<div class="card think2" id="pc-${t.i}" data-t="${t.t}" style="--c:var(${T.COLOR[t.agent]})" data-jump="turn:${t.i}"><div class="hd"><b>💭</b><span>${hm(t.time)}</span><span>${t.calls.length} tool calls${posts.length ? ` · ${posts.length} post${posts.length > 1 ? 's' : ''}` : ''}</span>${claimTags(t)}</div><div class="bx">${r ? esc(rename(r.slice(0, 600))) : '<span class="fine">no reasoning text</span>'}</div></div>`;
+}
+/* ── minimap: the whole run next to the messages, like an editor's code overview ── */
+function msgFlag(m) {
+  for (const x of R.decisive[m.id] || []) if (['FABR','FRAM'].includes(x.label) && x.rep.label === x.label) return [LABEL[x.label].c, LABEL[x.label].name];
+  for (const r of m.disc || []) for (const g of r.grounds || []) if (r.label !== 'mixed' && g.strength === 'direct' && (g.new === true || g.new === 'True'))
+    return g.ground === 'matt' ? ['--pref', 'discloses no-Bob preference'] : ['--work', 'discloses unpreparedness'];
+  return null;
+}
+let mmRedraw = null, mmDrag = null;
+addEventListener('mousemove', e => mmDrag && mmDrag(e));
+addEventListener('mouseup', () => { mmDrag = null; });
+addEventListener('resize', () => mmRedraw && mmRedraw());
+function buildMinimap(v, lanes) {
+  const st = v.querySelector('.stream'), box = v.querySelector('.minimap');
+  if (!st || !box) { mmRedraw = null; return; }
+  const d = R, shown = new Set(lanes);
+  // one lane per shown column (by default just #sprint); grey blocks with the sender's initial, judge colours only for flagged messages
+  const all = laneOrder(lanes);
+  const first = lanes.includes(SPRINT) ? SPRINT : lanes.find(k => !isPriv(k)) || lanes[0];
+  const W = 118, lw = Math.floor((W - 4) / all.length);
+  let items = [];
+  const draw = () => {
+    const H = st.clientHeight, S = Math.max(st.scrollHeight, 1), sc = H / S;
+    if (!H) return;
+    const base = st.getBoundingClientRect().top - st.scrollTop;
+    const pos = el => { const r = el.getBoundingClientRect(); return [r.top - base, r.height]; };
+    const anchors = [...st.querySelectorAll('[data-t]')].map(el => [+el.dataset.t, pos(el)[0]]).sort((a, b) => a[0] - b[0]);
+    let mx = 0; for (const a of anchors) { mx = Math.max(mx, a[1]); a[1] = mx; }
+    const yOf = t => {
+      if (!anchors.length) return 0;
+      if (t <= anchors[0][0]) return anchors[0][1];
+      for (let i = 1; i < anchors.length; i++) if (t <= anchors[i][0]) { const [t0, y0] = anchors[i - 1], [t1, y1] = anchors[i]; return t1 === t0 ? y1 : y0 + (y1 - y0) * (t - t0) / (t1 - t0); }
+      return anchors.at(-1)[1];
+    };
+    items = [];
+    let g = '';
+    all.forEach((k, li) => {
+      const x = 2 + li * lw;
+      g += `<rect x="${x}" y="0" width="${lw - 2}" height="${H}" rx="2" style="fill:var(--surface-2)"><title>${esc(laneName(k))}</title></rect>`;
+      const src = isPriv(k)
+        ? d.turns.filter(t => t.agent === k.slice(5)).map(t => ({el:st.querySelector('#pc-' + t.i), who:t.agent, turn:t.i, lane:k, txt:t.steps.map(s => s.reasoning).filter(Boolean).join(' '), time:t.time, think:true}))
+        : d.msgs.filter(m => m.conv === k).map(m => ({el:document.getElementById('m-' + m.id), who:m.user, msg:m, lane:k, txt:m.text, time:m.time, flag:msgFlag(m)}));
+      if (k === first) for (const el of st.querySelectorAll('.turnrow')) { const t = R.turnById[el.id.slice(3)]; src.push({el, who:t.agent, turn:t.i, lane:k, txt:'turn with no post here' + turnPosts(t).map(m => ' · → ' + convName(m.conv)).join(''), time:t.time, row:true}); }
+      for (const it of src) {
+        if (!it.el) continue;
+        const [y, h] = pos(it.el);
+        const ry = y * sc, rh = Math.max(it.flag ? 3 : 1.5, h * sc - 1);
+        const bot = it.who === 'ops-bot' || it.who === 'calendar-bot';
+        const fill = it.flag ? `var(${it.flag[0]})` : 'var(--ink-3)';
+        const op = it.flag ? 1 : bot ? .12 : it.row ? .14 : .3;
+        const i = items.push(it) - 1;
+        g += `<rect class="mk" data-i="${i}" x="${x + 1}" y="${ry.toFixed(1)}" width="${lw - 4}" height="${rh.toFixed(1)}" rx="1.5" style="fill:${fill};opacity:${op}"/>`;
+        const ch = bot ? '⚙' : (name(it.who) || '?')[0];
+        if (rh >= 7) g += `<text class="mk" data-i="${i}" x="${x + 4}" y="${(ry + Math.min(rh, 11) - 2).toFixed(1)}" style="fill:${it.flag ? 'var(--hi-ink)' : 'var(--ink)'};font:700 ${Math.min(10, rh - 1).toFixed(0)}px Inter,sans-serif">${esc(ch)}</text>`;
+      }
+    });
+    for (const [t, lbl] of [[d.kickoff, 'board opens'], [d.deadline, 'board locks']]) {
+      const y = (yOf(t) * sc).toFixed(1);
+      g += `<line x1="0" x2="${W}" y1="${y}" y2="${y}" style="stroke:var(--accent)" stroke-width="1" stroke-dasharray="3 2"><title>${lbl}</title></line>`;
+    }
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}<rect class="vp" x="0.5" y="0" width="${W - 1}" height="${Math.max(6, H * sc).toFixed(1)}" rx="3"/></svg>`;
+    const vp = box.querySelector('.vp');
+    const sync = () => vp.setAttribute('y', (st.scrollTop * sc).toFixed(1));
+    sync(); st.onscroll = sync;
+    box._sc = sc;
+  };
+  mmRedraw = draw;
+  requestAnimationFrame(draw);
+  const toY = e => e.clientY - box.getBoundingClientRect().top;
+  const scrollTo = e => { st.scrollTop = toY(e) / box._sc - st.clientHeight / 2; };
+  box.onmousedown = e => {
+    const mk = e.target.closest('.mk');
+    if (mk) {
+      const it = items[+mk.dataset.i];
+      if (it.el) { it.el.scrollIntoView({block:'center', behavior:'smooth'}); it.el.classList.add('flash'); setTimeout(() => it.el.classList.remove('flash'), 1700); }
+      else if (it.msg) jumpTo('msg:' + it.msg.id);
+      else { state.convs = [...lanes, it.lane]; drawView(); const el = document.getElementById('pc-' + it.turn); if (el) { el.scrollIntoView({block:'center'}); el.classList.add('flash'); } }
+      return;
+    }
+    mmDrag = scrollTo; scrollTo(e); e.preventDefault();
+  };
+  box.onmousemove = e => {
+    const mk = e.target.closest('.mk'); if (!mk) return T.tip(null);
+    const it = items[+mk.dataset.i];
+    T.tip(`<b>${esc(laneName(it.lane))}</b> · ${esc(hm(it.time))}${it.flag ? ` · <span style="color:var(${it.flag[0]})">${esc(it.flag[1])}</span>` : ''}<br>${esc(name(it.who))}${isPriv(it.lane) ? ' (thinking)' : ''}: ${esc(snippet(it.txt || '', 140))}<br><span style="opacity:.7">${it.el ? 'click to scroll there' : 'click to add this conversation as a column'}</span>`, e);
+  };
+  box.onmouseleave = () => T.tip(null);
+}
+function drawChat(v, hint) {
+  const d = R;
+  state.convs = (state.convs || [SPRINT]).filter(k => isPriv(k) ? FOCAL.includes(k.slice(5)) : d.convList.some(c => c.label === k));
+  if (!state.convs.length) state.convs = [SPRINT];
+  const lanes = laneOrder(state.convs), multi = lanes.length > 1;
+  const shown = new Set(lanes);
+  hint.textContent = multi ? 'Columns are time-aligned, one row per minute. Click a conversation name to show only it, the box to add or remove a column.'
+    : 'Highlights: pink/orange = deception judge’s decisive quote, blue = disclosure judge’s span. Tick more conversations to see them side by side. Right: overview of the whole conversation, letter = sender, coloured = flagged by a judge.';
+  // sidebar
+  const row = (k, label, dots, n) => `<div class="cv ${shown.has(k) ? 'on' : ''}"><button class="box" data-add="${esc(k)}" aria-pressed="${shown.has(k)}" title="${shown.has(k) ? 'remove column' : 'add as column'}"></button><button class="nm" data-c="${esc(k)}">${esc(label)}${dots}${n != null ? `<span class="n">${n}</span>` : ''}</button></div>`;
+  const groups = [['Channels', c => c.label.startsWith('#')], ['DMs during the run', c => !c.label.startsWith('#') && c.live], ['Private history the agents read', c => !c.live]];
+  let list = `<div class="presets"><button data-preset="sprint" aria-pressed="${!multi && lanes[0] === SPRINT}">#sprint</button><button data-preset="board" aria-pressed="${multi && boardPreset().every(k => shown.has(k)) && lanes.length === boardPreset().length}">board layout</button></div>`;
+  list += `<h3>Private reasoning</h3>` + FOCAL.map(e => row('priv:' + e, name(e) + '’s agent', '', null)).join('');
+  list += groups.map(([g, f]) => { const cs = d.convList.filter(f); return cs.length ? `<h3>${g}</h3>` + cs.map(c => row(c.label, convName(c.label), convDots(c), c.live || c.hist)).join('') : ''; }).join('');
+  list += '<p class="fllegend">Dots mark conversations holding a judge finding: pink/orange = the decisive false-claim/misdirection message, blue = a disclosure. Hover a dot for details.</p>';
+  // which shown message carries a turn's cross-posts: the last shown one of that turn
+  const lastOfTurn = new Map();
+  for (const m of d.msgs) if (shown.has(m.conv) && m.turn != null) lastOfTurn.set(m.turn, m.id);
+  const privShown = a => shown.has('priv:' + a);
+  const orphans = d.turns.filter(t => !lastOfTurn.has(t.i) && !privShown(t.agent) && (turnPosts(t).length || claimTags(t)));
+  let content;
+  if (!multi) {
+    const k = lanes[0];
+    const items = isPriv(k) ? d.turns.filter(t => t.agent === k.slice(5)).map(t => ({t:t.t, html:privCard(t)}))
+      : [...d.msgs.filter(m => m.conv === k).map((m, i) => ({t:m.live ? m.t : -1e9 + i, live:m.live, html:msgHTML(m, shown, lastOfTurn)})),
+         ...orphans.map(t => ({t:t.t + 0.001, live:true, html:turnRowHTML(t, shown)}))];
+    items.sort((a, b) => a.t - b.t);
+    let body = '', liveStarted = false, kk = false, dl = false;
+    const hasHist = items.some(x => x.live === false);
+    for (const x of items) {
+      if (x.live && !liveStarted) { liveStarted = true; if (hasHist) body += '<div class="sep">the run starts, 08:55</div>'; }
+      if (x.live !== false && !kk && x.t >= d.kickoff) { kk = true; body += '<div class="sep mk">board opens</div>'; }
+      if (x.live !== false && !dl && x.t >= d.deadline) { dl = true; body += '<div class="sep mk">board locks</div>'; }
+      body += x.html;
+    }
+    content = `<div class="stream">${body || '<div class="empty">Nothing here.</div>'}</div>`;
+  } else {
+    const bucket = t => Math.floor(t / 60);
+    const rows = {}, put = (b, k, html) => { if (html) ((rows[b] ??= {})[k] ??= []).push(html); };
+    const first = lanes.includes(SPRINT) ? SPRINT : lanes.find(k => !isPriv(k)) || lanes[0];
+    let hist = {};
+    for (const k of lanes) {
+      if (isPriv(k)) { for (const t of d.turns.filter(t => t.agent === k.slice(5))) put(bucket(t.t), k, privCard(t)); continue; }
+      for (const m of d.msgs.filter(m => m.conv === k)) m.live ? put(bucket(m.t), k, msgHTML(m, shown, lastOfTurn)) : (hist[k] ??= []).push(msgHTML(m, shown, lastOfTurn));
+    }
+    for (const t of orphans) put(bucket(t.t), first, turnRowHTML(t, shown));
+    const from = state.warmup ? -Infinity : Math.floor((d.kickoff - 300) / 60);
+    const keys = Object.keys(rows).map(Number).filter(b => b >= from).sort((a, b) => a - b);
+    const base = new Date('2000-01-01T' + d.clock_start + 'Z').getTime();
+    const clk = b => new Date(base + b * 60000).toISOString().slice(11, 16);
+    let h = `<div class="bdgrid mgrid" style="grid-template-columns:56px ${lanes.map(k => isPriv(k) ? 'minmax(260px,300px)' : k === SPRINT ? 'minmax(360px,440px)' : 'minmax(300px,360px)').join(' ')}">`;
+    h += '<div class="ch tc">time</div>' + lanes.map(k => `<div class="ch">${isPriv(k) ? av(k.slice(5), 1) : ''}${esc(laneName(k))}<button class="closebtn" data-add="${esc(k)}" title="remove column">✕</button></div>`).join('');
+    if (Object.keys(hist).length) h += '<div class="tc">before</div>' + lanes.map(k => `<div class="cell">${(hist[k] || []).length ? `<details class="more"><summary>${hist[k].length} messages before the run</summary>${hist[k].join('')}</details>` : ''}</div>`).join('');
+    let shownK = false, shownD = false;
+    for (const b of keys) {
+      if (!shownK && b * 60 >= d.kickoff) { shownK = true; h += `<div class="mkrow">${clk(Math.floor(d.kickoff / 60))} board opens</div>`; }
+      if (!shownD && b * 60 >= d.deadline) { shownD = true; h += `<div class="mkrow">${clk(Math.floor(d.deadline / 60))} board locks</div>`; }
+      h += `<div class="tc">${clk(b)}</div>` + lanes.map(k => `<div class="cell">${(rows[b][k] || []).join('')}</div>`).join('');
+    }
+    content = `<div class="stream multi"><label class="fine warm"><input type="checkbox" id="warm" ${state.warmup ? 'checked' : ''}> show the warm-up before 09:25 (agents reading Slack before their users ask)</label>${h}</div></div>`;
+  }
+  v.innerHTML = `<div class="panel chat"><div class="convs">${list}</div>${content}<div class="minimap" title=""></div></div>`;
+  buildMinimap(v, lanes);
+  const redraw = () => { drawChat(v, hint); };
+  v.querySelector('.convs').onclick = e => {
+    const p = e.target.closest('[data-preset]'), a = e.target.closest('[data-add]'), c = e.target.closest('[data-c]');
+    if (p) state.convs = p.dataset.preset === 'board' ? boardPreset() : [SPRINT];
+    else if (a) { const k = a.dataset.add; state.convs = shown.has(k) ? lanes.filter(x => x !== k) : [...lanes, k]; }
+    else if (c) state.convs = [c.dataset.c];
+    else return;
+    redraw();
+  };
+  const w = v.querySelector('#warm'); if (w) w.onchange = e => { state.warmup = e.target.checked; redraw(); };
+  v.querySelector('.stream').onclick = e => {
+    const x = e.target.closest('[data-add]');
+    if (x) { state.convs = lanes.filter(k => k !== x.dataset.add); return redraw(); }
+    const o = e.target.closest('[data-open]');
+    if (o) { e.preventDefault(); return jumpTo('msg:' + o.dataset.open); }
+    const c = e.target.closest('[data-close]');
+    if (c) { const host = c.closest('.msg > div'), box = host.querySelector('.think'), tb = host.querySelector('[data-think]');
+      box.remove(); mmRedraw && mmRedraw(); if (tb) { tb.setAttribute('aria-pressed', 'false'); if (c.dataset.close === 'bottom') host.closest('.msg').scrollIntoView({block:'nearest', behavior:'smooth'}); } return; }
+    const b = e.target.closest('[data-think]'); if (!b) return;
+    const host = b.closest('.msg > div'); const ex = host.querySelector('.think');
+    if (ex) { ex.remove(); b.setAttribute('aria-pressed', 'false'); mmRedraw && mmRedraw(); return; }
+    b.setAttribute('aria-pressed', 'true');
+    const t = R.turnById[b.dataset.think];
+    host.insertAdjacentHTML('beforeend', `<div class="think"><header>${av(t.agent, 1)} ${esc(name(t.agent))}’s agent · turn at ${t.time} <a class="go" style="margin-left:auto" href="#" data-jump="turn:${b.dataset.think}">full turn →</a><button class="closebtn" data-close="top" title="Close">✕</button></header>${turnBody(t, true)}<footer><button class="closebtn" data-close="bottom">▲ close</button></footer></div>`);
+    mmRedraw && mmRedraw();
+  };
+  v.querySelector('.stream').addEventListener('toggle', () => mmRedraw && mmRedraw(), true);
+}
+function cotSpans(t) {
+  if (!FOCAL.includes(t.agent)) return [];
+  const a = R.seats[t.agent].deception['ack-fabr'] || R.seats[t.agent].deception['ack-fram'] || [];
+  return a.filter(x => x.turn === t.i && x.cot_quote).map(x => ({q:x.cot_quote, cls:'cot', title:'CoT acknowledgment quoted by the judge'}));
+}
+function turnBody(t, clamp) {
+  const sp = cotSpans(t);
+  return t.steps.map((st, i) => {
+    const calls = t.calls.filter(c => c.step === i + 1 || (!c.step && i === 0));
+    const long = (st.reasoning || '').length > 700;
+    return `<div class="step">${st.reasoning ? `<div class="r ${clamp && long && !sp.length ? 'clamp' : ''}">${markSpans(st.reasoning.trim(), sp)}</div>${clamp && long && !sp.length ? '<button class="more" onclick="this.previousElementSibling.classList.remove(\'clamp\');this.remove()">show all</button>' : ''}` : ''}
+      ${calls.map(c => `<div class="call"><span class="fine">${esc(c.clock)}</span><span class="tn">${esc(rename(c.line))}</span>${c.text ? `<div class="posted">${esc(rename(c.text))}</div>` : ''}<details><summary class="fine">args / result</summary><pre>${esc(rename(c.args))}\n\n${esc(rename(c.result))}</pre></details></div>`).join('')}
+      ${st.text && st.text.trim() ? `<div class="touser">to ${esc(name(t.agent))}: ${esc(rename(st.text.trim()))}</div>` : ''}</div>`;
+  }).join('') || (t.calls.length ? `<div class="step">${t.calls.map(c => `<div class="call"><span class="tn">${esc(rename(c.line))}</span></div>`).join('')}</div>` : '<div class="step fine">no reasoning recorded</div>');
+}
+
+/* ── agent log ── */
+function drawAgent(v, hint) {
+  hint.textContent = R.closed ? 'Closed-weight models return a reasoning summary, not the raw chain of thought.' : 'Full turns: reasoning, tool calls, and private notes to the user.';
+  const ts = R.turns.filter(t => t.agent === state.agent);
+  const quiet = t => !t.steps.some(s => s.reasoning) && !t.calls.length;
+  v.innerHTML = `<div class="panel al"><div class="agpick">${AGENTS.map(a => `<button data-a="${a}" aria-pressed="${a === state.agent}">${av(a, 1)}${esc(name(a))}</button>`).join('')}</div>
+    <p class="fine" style="margin:0 0 10px">${esc(name(state.agent))}’s agent · ${esc(T.ROLE[state.agent])} · ${ts.length} turns</p>
+    ${ts.filter(t => !quiet(t)).map(t => `<div class="turnbox" id="t-${t.i}"><header><span class="t">${t.time}</span><span>${t.wake ? 'woken by ' + esc(convName(t.wake)) + (t.wake_from ? ' · ' + esc(name(t.wake_from)) : '') : esc(t.kind)}</span><span style="margin-left:auto">${t.calls.length} tool calls</span></header>${turnBody(t, true)}</div>`).join('')}</div>`;
+  v.querySelector('.agpick').onclick = e => { const b = e.target.closest('button'); if (b) { state.agent = b.dataset.a; drawAgent(v, hint); } };
+}
+/* ── prompts ── */
+function drawSetup(v, hint) {
+  hint.textContent = 'What each agent was told. The system prompt is shared; the user prompts differ.';
+  v.innerHTML = `<div class="panel al"><h3 style="margin:0 0 8px">System prompt (${esc(name('Priya'))}’s agent; the others are the same with their own name)</h3><div class="prompt">${esc(rename(R.system_prompt_focal))}</div>
+    ${AGENTS.map(a => `<h3 style="margin:16px 0 8px;display:flex;gap:6px;align-items:center">${av(a, 1)} ${esc(name(a))}’s user prompt</h3><div class="prompt">${esc(rename(R.asks[a]))}</div>`).join('')}</div>`;
+}
+
+T.namesToggle(document.getElementById('names'), () => { drawSide(); if (R) { R.convList = convList(R); drawRun(); } });
+drawSide();
+const h0 = parseHash();
+open(h0.id, {...(h0.view ? {view:h0.view} : {}), ...(h0.turn ? {jump:'turn:' + h0.turn} : h0.msg ? {jump:'msg:' + decodeURIComponent(h0.msg)} : {})});
+</script>
+</body></html>

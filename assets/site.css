@@ -1,0 +1,76 @@
+/* TRILEMMA project site. Category colours follow the paper figures (Okabe-Ito). */
+:root{
+  --bg:#f7f6f2;--surface:#fffefb;--surface-2:#efede6;--line:#e4e0d5;--line-2:#d3cdbf;
+  --ink:#24262b;--ink-2:#53565e;--ink-3:#888a91;--inv:#fffefb;--accent:#b04a6e;
+  /* the three corners */
+  --hon:#0e8f6b;--hon-rgb:14,143,107;--conf:#3f5fb8;--conf-rgb:63,95,184;--task:#d0662a;--task-rgb:208,102,42;
+  /* judge categories (paper Fig. 2) */
+  --fabr:#cc79a7;--fabr-rgb:204,121,167;--fram:#e69f00;--fram-rgb:230,159,0;--noth:#009e73;--noth-rgb:0,158,115;
+  --t1:#0072b2;--nomsg:#bbbbbb;--pref:#1b4b8f;--work:#7cc3ea;
+  /* people */
+  --alice:#c2477a;--carol:#2f6fd1;--bob:#3a8a5c;--dan:#c9821c;--mary:#7a55c7;--other:#8a8f99;
+  --mark-rgb:204,121,167;--hi-ink:#fff;
+  --serif:Newsreader,"Iowan Old Style",Georgia,serif;--mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111215;--surface:#18191d;--surface-2:#212328;--line:#2b2d33;--line-2:#3b3e45;
+  --ink:#ebecef;--ink-2:#a8aab1;--ink-3:#73767d;--inv:#111215;--accent:#ec8fb0;
+  --hon:#3fc49a;--hon-rgb:63,196,154;--conf:#8aa3ee;--conf-rgb:138,163,238;--task:#f0915a;--task-rgb:240,145,90;
+  --fabr:#e09cc4;--fabr-rgb:224,156,196;--fram:#f2b53a;--fram-rgb:242,181,58;--noth:#3cc79a;--noth-rgb:60,199,154;
+  --t1:#4aa6e0;--nomsg:#6d6f75;--pref:#6f95e0;--work:#9fd6f5;
+  --alice:#ec79a8;--carol:#6fa1f0;--bob:#69bf8c;--dan:#e8a64a;--mary:#a98bea;--other:#8d929c;
+  --hi-ink:#111;color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#111215;--surface:#18191d;--surface-2:#212328;--line:#2b2d33;--line-2:#3b3e45;
+  --ink:#ebecef;--ink-2:#a8aab1;--ink-3:#73767d;--inv:#111215;--accent:#ec8fb0;
+  --hon:#3fc49a;--hon-rgb:63,196,154;--conf:#8aa3ee;--conf-rgb:138,163,238;--task:#f0915a;--task-rgb:240,145,90;
+  --fabr:#e09cc4;--fabr-rgb:224,156,196;--fram:#f2b53a;--fram-rgb:242,181,58;--noth:#3cc79a;--noth-rgb:60,199,154;
+  --t1:#4aa6e0;--nomsg:#6d6f75;--pref:#6f95e0;--work:#9fd6f5;
+  --alice:#ec79a8;--carol:#6fa1f0;--bob:#69bf8c;--dan:#e8a64a;--mary:#a98bea;--other:#8d929c;
+  --hi-ink:#111;color-scheme:dark;}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px;position:relative}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.logo{width:26px;height:26px;flex:none}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid transparent;transition:border-color .2s}
+.nav.scrolled{border-bottom-color:var(--line)}
+.navin{display:flex;align-items:center;gap:4px;height:58px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.08em;text-decoration:none;margin-right:auto;font-size:15px}
+.nav a.l{font-size:14px;color:var(--ink-2);text-decoration:none;padding:7px 10px;border-radius:7px}
+.nav a.l:hover,.nav a.l.on{color:var(--ink);background:var(--surface-2)}
+.iconbtn{height:34px;min-width:34px;display:inline-grid;place-items:center;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink-2);margin-left:8px;padding:0 8px;font-size:13px}
+.iconbtn:hover{color:var(--ink);border-color:var(--line-2)}
+
+/* shared bits */
+.av{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--c);color:var(--hi-ink);font-size:11px;font-weight:700;flex:none;font-style:normal}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;border:1px solid color-mix(in srgb,var(--c) 45%,var(--line));color:var(--ink);background:color-mix(in srgb,var(--c) 12%,var(--surface));white-space:nowrap}
+.chip::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c)}
+.chip.plain::before{display:none}
+.seg{display:inline-flex;flex-wrap:wrap;background:var(--surface-2);border-radius:10px;padding:3px}
+.seg button{font-size:13.5px;padding:6px 14px;border-radius:8px;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.btn{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 18px;border-radius:10px;font-size:14.5px;font-weight:600;text-decoration:none;border:1px solid var(--line-2);background:var(--surface)}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--ink);color:var(--inv);border-color:var(--ink)}
+.btn.primary:hover{opacity:.88}
+.btn.soon{color:var(--ink-3);border-style:dashed;cursor:default}
+.go{color:var(--accent);font-weight:600;text-decoration:none;font-size:13.5px;white-space:nowrap}
+.go:hover{text-decoration:underline}
+mark{background:rgba(var(--mark-rgb),.2);color:inherit;border-radius:2px;padding:0 1px;text-decoration:underline 2px rgba(var(--mark-rgb),.85);text-underline-offset:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+mark.fram{--mark-rgb:var(--fram-rgb)}mark.fabr{--mark-rgb:var(--fabr-rgb)}mark.noth{--mark-rgb:var(--noth-rgb)}
+mark.disc{--mark-rgb:var(--conf-rgb)}mark.cot{--mark-rgb:var(--task-rgb)}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--inv);font-size:12.5px;line-height:1.5;padding:8px 11px;border-radius:8px;opacity:0;transition:opacity .1s;z-index:100;max-width:340px}
+.tip b{font-weight:600}
+.tip .q{display:block;margin-top:4px;font-family:var(--serif);font-size:14px;opacity:.9}
+.muted{color:var(--ink-3)}
+.fine{font-size:13px;color:var(--ink-3)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
