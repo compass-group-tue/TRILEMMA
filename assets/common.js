@@ -1,7 +1,7 @@
 // Shared by index.html and traces.html: paper names, judge categories, theme toggle, tooltip.
 window.T = (() => {
   // the rollouts use the workspace names; the paper uses placeholders
-  const PAPER = {Priya:'Alice', Nadia:'Carol', Matthieu:'Bob', Rafael:'Dan', Helena:'Mary', Ines:'Emily', Zofia:'Fiona'};
+  const PAPER = {Priya:'Alice', Nadia:'Carol', Matthieu:'Bob', Rafael:'Dan', Helena:'Mary', Ines:'Emily', Zofia:'Fiona', Callum:'George'};
   const COLOR = {Priya:'--alice', Nadia:'--carol', Matthieu:'--bob', Rafael:'--dan', Helena:'--mary'};
   const ROLE = {Priya:'data scientist', Nadia:'data scientist', Matthieu:'backend engineer', Rafael:'product manager · chair', Helena:'engineering manager'};
   let paperNames = true;
@@ -47,5 +47,68 @@ window.T = (() => {
     if (n) addEventListener('scroll', () => n.classList.toggle('scrolled', scrollY > 8), {passive:true});
   }
   const forcePaper = () => { paperNames = true; };
-  return {forcePaper, PAPER, COLOR, ROLE, LABEL, name, rename, esc, av, theme, namesToggle, tip, nav, get paperNames() { return paperNames; }};
+
+  /* ── data files: JSONP (plain, or gzip+base64 decoded with DecompressionStream), so file:// works too ── */
+  const waiting = {}, loaded = {};
+  async function gunzip(b64) {
+    const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const ds = new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return JSON.parse(await new Response(ds).text());
+  }
+  const deliver = (kind, key, obj) => { const k = kind + ':' + key; loaded[k] = obj; (waiting[k] || []).forEach(f => f[0](obj)); delete waiting[k]; };
+  for (const kind of ['TRACE_LOAD', 'TRACE_RESULTS', 'TRACE_WORLD']) {
+    window[kind] = (key, obj) => deliver(kind, key, obj);
+    window[kind + '_GZ'] = (key, b64) => gunzip(b64).then(o => deliver(kind, key, o));
+  }
+  function jsonp(kind, key, src) {
+    const k = kind + ':' + key;
+    if (loaded[k]) return Promise.resolve(loaded[k]);
+    return new Promise((res, rej) => {
+      if (!waiting[k]) {
+        waiting[k] = [];
+        const s = document.createElement('script'); s.src = src;
+        s.onerror = () => { (waiting[k] || []).forEach(f => f[1](new Error('missing ' + src))); delete waiting[k]; };
+        document.body.appendChild(s);
+      }
+      waiting[k].push([res, rej]);
+    });
+  }
+  // id = "<setting>/<run>"; resolves to the run with the world's pre-run messages merged in (live: false)
+  async function loadRun(id) {
+    const d = await jsonp('TRACE_LOAD', id, `data/runs/${id}.js`);
+    if (!d._merged) {
+      const w = await jsonp('TRACE_WORLD', d.world, `data/worlds/${d.world}.js`);
+      d.worldDoc = w;
+      d.msgs = [...w.msgs.map(m => ({...m, live: false, t: null})), ...d.msgs];
+      d.convs = w.convs;
+      d._merged = true;
+    }
+    return d;
+  }
+  // full tool results of a run; references to messages and shared fragments expanded
+  async function loadResults(d) {
+    if (d.results) return d.results;
+    const raw = await jsonp('TRACE_RESULTS', d.id, `data/results/${d.id}.js`);
+    const byTs = {};
+    for (const m of d.msgs) byTs[m.id.slice(m.id.indexOf(':') + 1)] = m;
+    const blobs = (d.worldDoc && d.worldDoc.blobs) || {};
+    const ex = o => {
+      if (Array.isArray(o)) return o.map(ex);
+      if (o && typeof o === 'object') {
+        if ('$b' in o) return ex(blobs[o.$b]);
+        if ('$m' in o) {
+          const m = byTs[o.$m] || {};
+          const out = o.$nt ? {} : {type: 'message'};
+          Object.assign(out, {ts: o.$m, user: m.uid, text: m.text});
+          for (const [k, v] of Object.entries(o)) if (k !== '$m' && k !== '$nt') out[k] = ex(v);
+          return out;
+        }
+        return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ex(v)]));
+      }
+      return o;
+    };
+    d.results = raw.map(ex);
+    return d.results;
+  }
+  return {forcePaper, jsonp, loadRun, loadResults, PAPER, COLOR, ROLE, LABEL, name, rename, esc, av, theme, namesToggle, tip, nav, get paperNames() { return paperNames; }};
 })();

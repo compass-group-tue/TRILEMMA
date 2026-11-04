@@ -323,7 +323,7 @@ footer.site .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:
     <li><i>1</i>ELLIS Institute Tübingen</li><li><i>2</i>MPI for Intelligent Systems</li><li><i>3</i>Tübingen AI Center</li><li><i>4</i>University of Massachusetts Amherst</li>
   </ul>
   <div class="cta">
-    <a class="btn primary" href="traces.html">Browse the traces</a>
+    <a class="btn primary" href="traces.html" title="Every run cited in the paper: 815 runs in 25 settings">Browse the traces</a>
     <a class="btn soon" title="Link once the preprint is public">Paper · soon</a>
     <a class="btn soon" title="Environment, prompts and trajectories will be released">Code · soon</a>
   </div>
@@ -799,10 +799,9 @@ document.getElementById('mrExNext').onclick = () => mrGo(1);
 document.getElementById('mrFilt').onclick = ev => { const b = ev.target.closest('button'); if (!b) return; mrF = b.dataset.f; mrE = 0; mrGo(0); };
 drawMrPick();
 
-/* ── replay a real morning (data/runs/<SHOW>.js) ── */
+/* ── replay a real morning (data/runs/main/<SHOW>.js) ── */
 const SHOW = {file:'dspro_s6', focal:'Nadia'};
 let RUN = null, rpTimers = [];
-window.TRACE_LOAD = d => { RUN = d; drawReplay(); playReplay(); };
 function findMark(text, quote, cls) {
   if (!quote) return esc(text);
   const norm = s => s.replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
@@ -818,7 +817,7 @@ function drawReplay() {
   document.getElementById('rpMeta').textContent = `${RUN.model_name} · ${RUN.seed} · following ${name(f)}’s agent`;
   document.getElementById('rpOpen').href = `traces.html#${RUN.model}_${RUN.seed}`;
   document.getElementById('rpReadH').textContent = `What ${name(f)}’s agent read`;
-  const secret = RUN.msgs.filter(m => !m.live && m.user === f);
+  const secret = RUN.msgs.filter(m => !m.live && m.user === f && /^dm:/.test(m.conv) && /Ines|Zofia/.test(m.conv));
   const pickMsg = re => secret.find(m => re.test(m.text));
   const reads = [pickMsg(/I'm done|I’m done|quit|give notice/i), pickMsg(/underprepared/i)].filter(Boolean);
   document.getElementById('rpRead').innerHTML = reads.map(m => {
@@ -851,7 +850,7 @@ function playReplay() {
 }
 document.getElementById('rpAgain').onclick = playReplay;
 // start the replay when it scrolls into view
-new IntersectionObserver((es, ob) => { if (es.some(e => e.isIntersecting)) { ob.disconnect(); const sc = document.createElement('script'); sc.src = `data/runs/${SHOW.file}.js`; document.body.appendChild(sc); } }, {rootMargin:'200px'}).observe(document.getElementById('round'));
+new IntersectionObserver((es, ob) => { if (es.some(e => e.isIntersecting)) { ob.disconnect(); T.loadRun(`main/${SHOW.file}`).then(d => { RUN = d; drawReplay(); playReplay(); }); } }, {rootMargin:'200px'}).observe(document.getElementById('round'));
 
 document.getElementById('copyBib').onclick = () => { navigator.clipboard?.writeText(document.getElementById('bib').textContent); document.getElementById('copyBib').textContent = 'Copied'; };
 function drawAll() { drawPeople(); drawTri(); drawMatrix(); drawConf(); drawLadder(); drawReplay(); if (RUN) document.querySelectorAll('#feed .bub').forEach(b => b.classList.remove('wait')); }

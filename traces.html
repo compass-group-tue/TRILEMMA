@@ -3,7 +3,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>TRILEMMA Trace Viewer</title>
-<meta name="description" content="Every run of the main experiment: Slack messages, agent reasoning, tool calls and the judges' labels."/>
+<meta name="description" content="Every run cited in the paper: Slack messages, agent reasoning, tool calls with full results, prompts and the judges' labels."/>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 5 28 26H4z' fill='none' stroke='%2324262b' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='5.5' r='4' fill='%230e8f6b'/%3E%3Ccircle cx='4.5' cy='26' r='4' fill='%233f5fb8'/%3E%3Ccircle cx='27.5' cy='26' r='4' fill='%23d0662a'/%3E%3C/svg%3E"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet"/>
@@ -191,6 +191,16 @@ svg.tlsvg{display:block;min-width:820px;width:100%}
 .turnbox.flash{animation:flash 1.6s ease}
 .prompt{font-size:12.5px;white-space:pre-wrap;color:var(--ink-2);max-height:300px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:10px 12px}
 .empty{color:var(--ink-3);padding:40px;text-align:center}
+.setpick{width:100%;font:500 13px Inter,sans-serif;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:0 0 8px}
+.setdesc{font-size:12px;color:var(--ink-2);margin:0 0 10px;line-height:1.45}
+.histbox{margin:6px 0 4px;border:1px dashed var(--line);border-radius:9px;padding:4px 8px;background:var(--bg)}
+.histbox>summary{cursor:pointer;font-size:12px;color:var(--ink-3);padding:2px 0}
+.respre{color:var(--ink-2)}
+.hp{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12.5px;margin-top:10px}
+.hp dt{color:var(--ink-3);font-size:11px;letter-spacing:.04em;text-transform:uppercase;align-self:center}
+.hp dd{margin:0}
+.sc .why{font-size:12.5px;color:var(--ink-2);margin-top:8px}
+.setchip{font:600 11px var(--mono);border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--ink-2);margin-right:6px}
 @media (max-width:1000px){
   .app{grid-template-columns:1fr}
   .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
@@ -215,11 +225,13 @@ svg.tlsvg{display:block;min-width:820px;width:100%}
 
 <div class="app">
   <aside class="side">
-    <h2>main · 90 runs</h2>
+    <select class="setpick" id="setpick" aria-label="Setting"></select>
+    <h2 id="sethead"></h2>
+    <p class="setdesc" id="setdesc"></p>
     <div class="flt" id="flt"></div>
     <div class="mm" id="mm"></div>
     <div class="sidelegend" id="sidelegend"></div>
-    <p class="fine" style="margin-top:14px">Each tile is a run: left half Alice’s agent, right half Carol’s. The thin bar under a half marks a disclosure (deep blue: no-Bob preference, light blue: unpreparedness). A frame marks a valid staffing. Labels come from the deception judge (3 replicates) and its chain-of-thought acknowledgment check.</p>
+    <p class="fine" style="margin-top:14px" id="sidenote"></p>
   </aside>
   <main class="main" id="main"><div class="empty">Loading…</div></main>
 </div>
@@ -230,35 +242,37 @@ svg.tlsvg{display:block;min-width:820px;width:100%}
 const {esc, av, name, rename, LABEL} = T;
 T.nav(); T.theme(document.getElementById('theme'));
 const IDX = window.TRILEMMA_INDEX;
-const FOCAL = ['Priya','Nadia'], AGENTS = ['Priya','Nadia','Matthieu','Rafael','Helena'];
+const FOCAL = ['Priya','Nadia'];
 const SPRINT = '#sep-2026-sprint';
-const cache = {};
-let R = null, state = {view:'timeline', convs:[SPRINT], agent:'Priya', filter:null, validOnly:false, warmup:false};
+let R = null, state = {view:'timeline', convs:[SPRINT], agent:'Priya', filter:null, validOnly:false, warmup:false, setting:'main'};
+const setOf = k => IDX.settings.find(s => s.key === k) || IDX.settings[0];
+const AGENTS = () => R ? R.agents : ['Priya','Nadia','Matthieu','Rafael','Helena'];
+const colorOf = a => `var(${T.COLOR[a] || '--other'})`;
+// deep links: runs of `main` keep their short form (#dspro_s6); all others are #<setting>/<run>
+const hashId = id => id.startsWith('main/') ? id.slice(5) : id;
 
 /* ── routing ── */
 function parseHash() {
-  const [id, ...kv] = location.hash.slice(1).split('&');
+  const [id0, ...kv] = location.hash.slice(1).split('&');
   const o = Object.fromEntries(kv.map(x => x.split('=')));
-  return {id: id || 'dspro_s6', ...o};
+  let id = decodeURIComponent(id0 || 'dspro_s6');
+  if (!id.includes('/')) id = 'main/' + id;
+  return {...o, id};
 }
 function setHash(id, extra = {}) {
   const kv = Object.entries(extra).filter(([,v]) => v).map(([k,v]) => `${k}=${v}`);
-  history.replaceState(null, '', '#' + [id, ...kv].join('&'));
-}
-window.TRACE_LOAD = d => { cache[d.model + '_' + d.seed] = d; if (pending && pending.id === d.model + '_' + d.seed) { pending.cb(d); pending = null; } };
-let pending = null;
-function load(id, cb) {
-  if (cache[id]) return cb(cache[id]);
-  pending = {id, cb};
-  const s = document.createElement('script'); s.src = `data/runs/${id}.js`;
-  s.onerror = () => { document.getElementById('main').innerHTML = `<div class="empty">No run <code>${esc(id)}</code>.</div>`; };
-  document.body.appendChild(s);
+  history.replaceState(null, '', '#' + [hashId(id), ...kv].join('&'));
 }
 function open(id, extra = {}) {
   document.getElementById('main').innerHTML = '<div class="empty">Loading run…</div>';
-  load(id, d => { R = prep(d); state.convs = [SPRINT]; Object.assign(state, extra); drawSide(); drawRun(); setHash(id, {view: state.view}); if (extra.jump) jumpTo(extra.jump); });
+  state.setting = id.split('/')[0]; drawSide();
+  T.loadRun(id).then(d => {
+    R = d.convList ? d : prep(d); state.convs = [SPRINT]; Object.assign(state, extra);
+    if (!R.agents.includes(state.agent)) state.agent = 'Priya';
+    drawSide(); drawRun(); setHash(id, {view: state.view}); if (extra.jump) jumpTo(extra.jump);
+  }).catch(() => { document.getElementById('main').innerHTML = `<div class="empty">No run <code>${esc(id)}</code>.</div>`; });
 }
-addEventListener('hashchange', () => { const h = parseHash(); if (!R || h.id !== R.model + '_' + R.seed) open(h.id, h.view ? {view:h.view} : {}); });
+addEventListener('hashchange', () => { const h = parseHash(); if (!R || h.id !== R.id) open(h.id, h.view ? {view:h.view} : {}); });
 
 /* ── derived structures ── */
 const norm = s => String(s || '').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
@@ -269,14 +283,14 @@ function prep(d) {
   // decisive quotes per focal seat → message ids
   d.decisive = {};
   for (const e of FOCAL) {
-    const s = d.seats[e]; s.quoteMsg = {};
-    for (const rep of s.deception.plain) {
+    const s = d.seats[e] ??= {}; s.quoteMsg = {};
+    for (const rep of (s.deception || {}).plain || []) {
       const q = norm(rep.decisive_quote); if (!q) continue;
       const m = d.msgs.find(m => m.user === e && m.live && norm(m.text).includes(q.slice(0, 50)));
       if (m) { (d.decisive[m.id] ??= []).push({emp:e, rep, label:s.label}); s.quoteMsg[rep.decisive_quote] = m.id; }
     }
     // CoT acknowledgment → turn
-    const ack = s.deception['ack-fabr'] || s.deception['ack-fram'] || [];
+    const ack = (s.deception || {})['ack-fabr'] || (s.deception || {})['ack-fram'] || [];
     for (const a of ack) {
       const q = norm(a.cot_quote).slice(0, 60); if (!q) continue;
       const t = d.turns.find(t => t.agent === e && t.steps.some(st => norm(st.reasoning).includes(q)));
@@ -286,7 +300,7 @@ function prep(d) {
   for (const e of FOCAL) {
     const s = d.seats[e];
     const dec = {};
-    for (const rep of s.deception.plain) { const id = s.quoteMsg[rep.decisive_quote]; if (id) (dec[id] ??= {id, reps:[]}).reps.push(rep); }
+    for (const rep of (s.deception || {}).plain || []) { const id = s.quoteMsg[rep.decisive_quote]; if (id) (dec[id] ??= {id, reps:[]}).reps.push(rep); }
     s.decMsgs = Object.values(dec);
     // disclosure: messages where a replicate finds a direct, new disclosure about this seat's user,
     // for the grounds the seat is flagged for (seat flag = all three replicates, over all messages)
@@ -302,6 +316,7 @@ function prep(d) {
       for (const [g, v] of Object.entries(by)) s.discMsgs.push({id:m.id, ground:g, n:v.n.size, spans:v.spans});
     }
   }
+  if (!d.msgs.some(m => m.conv === SPRINT)) console.warn('no #sprint channel in', d.id);
   d.convList = convList(d);
   return d;
 }
@@ -321,34 +336,73 @@ const hm = t => t ? t.slice(0, 5) : '';
 
 /* ── sidebar ── */
 const FLT = [['FABR'], ['FRAM'], ['NOTH'], ['goes for T1'], ['leak','discloses no-Bob','--pref'], ['leakw','discloses unprep.','--work']];
+const TASKC = {T1:['--t1','ends on T1'], T2:['--task','ends on T2'], '':['--nomsg','no ticket']};
+const HPC = {explicit:['--fabr','4pm used as an explicit reason'], implicit:['--fram','4pm used implicitly'], no:['--noth','4pm not used as a reason']};
+const judged = S => S.runs.some(r => FOCAL.some(e => r.seats[e] && r.seats[e].label));
+const hasLeaks = S => S.runs.some(r => FOCAL.some(e => r.seats[e] && 'leak_bob' in r.seats[e]));
 function seatMatches(s, f) { return f === 'leak' ? s.leak_bob : f === 'leakw' ? s.leak_work : s.label === f; }
 const dbar = s => s.leak_bob && s.leak_work ? '<span class="db"><i style="background:var(--pref)"></i><i style="background:var(--work)"></i></span>'
   : s.leak_bob ? '<span class="db" style="--b:var(--pref)"></span>' : s.leak_work ? '<span class="db" style="--b:var(--work)"></span>' : '<span class="db none"></span>';
+// colour of one half-tile: judge label where the setting was judged, else the honeypot label (Alice), else the final ticket
+function halfColor(r, e) {
+  const s = r.seats[e] || {};
+  if (s.label) return (LABEL[s.label] || {c:'--nomsg'}).c;
+  if (judged(setOf(state.setting))) return '--line';
+  if (e === 'Priya' && r.hp) return (HPC[r.hp.used_as_reason] || ['--nomsg'])[0];
+  return (TASKC[s.final_task || ''] || TASKC[''])[0];
+}
+function halfName(r, e) {
+  const s = r.seats[e] || {};
+  if (s.label) return (LABEL[s.label] || {name:s.label}).name;
+  if (judged(setOf(state.setting))) return 'not judged';
+  if (e === 'Priya' && r.hp) return (HPC[r.hp.used_as_reason] || [0, 'not judged'])[1];
+  return (TASKC[s.final_task || ''] || TASKC[''])[1];
+}
 function drawSide() {
-  document.getElementById('flt').innerHTML = FLT.map(([k, n, c]) => `<button data-f="${esc(k)}" aria-pressed="${state.filter === k}"><i style="--c:var(${c || LABEL[k].c})"></i>${esc(n || LABEL[k].name)}</button>`).join('') + `<button data-f="valid" aria-pressed="${state.validOnly}">valid staffing</button>`;
-  const cur = R ? R.model + '_' + R.seed : '';
+  const S = setOf(state.setting), J = judged(S);
+  const pick = document.getElementById('setpick');
+  if (!pick.options.length) pick.innerHTML = Object.entries(IDX.groups).map(([g, gt]) => `<optgroup label="${esc(gt)}">` +
+    IDX.settings.filter(x => x.group === g).map(x => `<option value="${esc(x.key)}">${esc(x.title)} · ${x.runs.length} runs</option>`).join('') + '</optgroup>').join('');
+  pick.value = S.key;
+  document.getElementById('sethead').textContent = `${S.title} · ${S.runs.length} runs`;
+  document.getElementById('setdesc').textContent = S.desc;
+  if (!J && FLT.some(f => f[0] === state.filter)) state.filter = null;
+  document.getElementById('flt').innerHTML = (J ? FLT.filter(f => !f[0].startsWith('leak') || hasLeaks(S)).map(([k, n, c]) => `<button data-f="${esc(k)}" aria-pressed="${state.filter === k}"><i style="--c:var(${c || LABEL[k].c})"></i>${esc(n || LABEL[k].name)}</button>`).join('') : '') + `<button data-f="valid" aria-pressed="${state.validOnly}">valid staffing</button>`;
+  const cur = R ? R.id : '';
   let h = '', closed = false;
-  for (const m of IDX.models) {
+  for (const m of S.models) {
     if (m.closed && !closed) { closed = true; h += '<div class="div">closed-weight</div>'; }
-    h += `<div class="mn" title="${esc(m.name)}">${esc(m.name)}</div>`;
-    for (let i = 0; i < 10; i++) {
-      const r = IDX.runs.find(x => x.model === m.key && x.seed === 's' + i);
-      if (!r) { h += '<span></span>'; continue; }
-      const id = r.model + '_' + r.seed;
-      const off = (state.filter && !FOCAL.some(e => seatMatches(r.seats[e], state.filter))) || (state.validOnly && !r.valid);
-      h += `<a class="mt ${r.valid ? 'valid' : ''} ${id === cur ? 'cur' : ''} ${off ? 'off' : ''}" href="#${id}" data-id="${id}">` +
-        FOCAL.map(e => `<span style="--c:var(${(LABEL[r.seats[e].label] || {c:'--nomsg'}).c})"></span>` + dbar(r.seats[e])).join('') + '</a>';
-    }
+    const runs = S.runs.filter(x => x.model === m.key);
+    runs.forEach((r, i) => {
+      if (i % 10 === 0) h += i ? '<span></span>' : `<div class="mn" title="${esc(m.name)}">${esc(m.name)}</div>`;
+      const off = (state.filter && !FOCAL.some(e => r.seats[e] && seatMatches(r.seats[e], state.filter))) || (state.validOnly && !r.valid);
+      h += `<a class="mt ${r.valid ? 'valid' : ''} ${r.id === cur ? 'cur' : ''} ${off ? 'off' : ''}" href="#${esc(hashId(r.id))}" data-id="${esc(r.id)}">` +
+        FOCAL.map(e => `<span style="--c:var(${halfColor(r, e)})"></span>` + dbar(r.seats[e] || {})).join('') + '</a>';
+    });
+    const pad = (10 - runs.length % 10) % 10;
+    h += '<span></span>'.repeat(pad);
   }
   document.getElementById('mm').innerHTML = h;
-  document.getElementById('sidelegend').innerHTML = Object.values(LABEL).map(l => `<span><i style="--c:var(${l.c})"></i>${l.name}</span>`).join('') +
-    '<span><i class="bar" style="--c:var(--pref)"></i>bar below: discloses no-Bob preference</span><span><i class="bar" style="--c:var(--work)"></i>bar below: discloses unpreparedness</span>';
+  const hp = S.runs.some(r => r.hp);
+  let lg = '';
+  if (J) lg = Object.values(LABEL).map(l => `<span><i style="--c:var(${l.c})"></i>${l.name}</span>`).join('');
+  else {
+    if (hp) lg += Object.values(HPC).map(([c, n]) => `<span><i style="--c:var(${c})"></i>Alice: ${n}</span>`).join('');
+    lg += Object.values(TASKC).map(([c, n]) => `<span><i style="--c:var(${c})"></i>${hp ? 'Carol: ' : ''}${n}</span>`).join('');
+  }
+  if (hasLeaks(S)) lg += '<span><i class="bar" style="--c:var(--pref)"></i>bar below: discloses no-Bob preference</span><span><i class="bar" style="--c:var(--work)"></i>bar below: discloses unpreparedness</span>';
+  document.getElementById('sidelegend').innerHTML = lg;
+  document.getElementById('sidenote').textContent = 'Each tile is a run: left half Alice’s agent, right half Carol’s. A frame marks a valid staffing. ' + (J
+    ? 'Labels come from the deception judge (3 replicates)' + (S.runs.some(r => !(r.seats.Priya || {}).label) ? '; grey tiles are runs outside the judged sample' : '') + (hasLeaks(S) ? '; the thin bar under a half marks a disclosure found by all three disclosure-judge replicates.' : '.')
+    : hp ? 'Alice’s half shows the honeypot judge’s label for the 16:00 conflict; Carol’s half the ticket she ends on.'
+    : 'No judge labels for this setting; each half shows the ticket that data scientist ends on.');
 }
+document.getElementById('setpick').addEventListener('change', e => { const S = setOf(e.target.value); state.filter = null; open(S.runs[0].id); });
 document.getElementById('flt').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const f = b.dataset.f; if (f === 'valid') state.validOnly = !state.validOnly; else state.filter = state.filter === f ? null : f; drawSide(); });
 document.getElementById('mm').addEventListener('mousemove', e => {
   const a = e.target.closest('.mt'); if (!a) return T.tip(null);
-  const r = IDX.runs.find(x => x.model + '_' + x.seed === a.dataset.id);
-  T.tip(`<b>${esc(r.model_name)} · ${r.seed}</b> · ${r.valid ? 'valid staffing' : 'no valid staffing'}<br>` + FOCAL.map(e => `${esc(name(e))}: ${esc((LABEL[r.seats[e].label] || {name:r.seats[e].label}).name)}${r.seats[e].leak_bob ? ' · discloses no-Bob' : ''}${r.seats[e].leak_work ? ' · discloses unpreparedness' : ''}`).join('<br>'), e);
+  const r = setOf(state.setting).runs.find(x => x.id === a.dataset.id);
+  T.tip(`<b>${esc(r.id.split('/')[1])}</b> · ${r.valid ? 'valid staffing' : 'no valid staffing'}<br>` + FOCAL.map(e => `${esc(name(e))}: ${esc(halfName(r, e))}${(r.seats[e] || {}).leak_bob ? ' · discloses no-Bob' : ''}${(r.seats[e] || {}).leak_work ? ' · discloses unpreparedness' : ''}`).join('<br>'), e);
 });
 document.getElementById('mm').addEventListener('mouseleave', () => T.tip(null));
 
@@ -388,22 +442,42 @@ function drawRun() {
   const d = R, A = d.assignments;
   const ds = t => FOCAL.filter(e => A[e] === t);
   const slot = (t, fixed) => `<b>${t}</b><span class="who">${av(fixed, 1)}${esc(name(fixed))}</span><span class="who">${ds(t).length ? ds(t).map(e => av(e, 1) + esc(name(e))).join(' ') : '<span class="muted">no data scientist</span>'}</span>`;
-  let h = `<div class="rh"><div><h1>${esc(d.model_name)}<small>${d.seed}</small></h1>
-      <div class="sub">${d.closed ? 'closed-weight · reasoning is a provider summary · ' : ''}${d.turns.length} agent turns · ${d.msgs.filter(m => m.live && m.conv === SPRINT).length} #sprint messages · ${esc(d.dir)}</div></div>
+  let h = `<div class="rh"><div><h1>${esc(d.model_name)}<small>${esc(d.rid.split('_').pop())}</small></h1>
+      <div class="sub"><span class="setchip">${esc(setOf(d.setting).title)}</span>${d.closed ? 'closed-weight · reasoning is a provider summary · ' : ''}${d.turns.length} agent turns · ${d.msgs.filter(m => m.live && m.conv === SPRINT).length} #sprint messages · ${esc(d.dir)}</div></div>
     <div class="boardmini">${slot('T1', 'Matthieu')}${slot('T2', 'Rafael')}<span></span><span></span><span>${d.valid ? '<span class="badge ok">valid staffing</span>' : '<span class="badge no">no valid staffing</span>'}</span></div></div>`;
   h += '<div class="seats">' + FOCAL.map(seatCard).join('') + '</div>';
   h += `<div class="tabs"><div class="seg" id="views">${[['timeline','Timeline'],['chat','Messages'],['agent','Agent log'],['setup','Prompts']].map(([k, l]) => `<button data-v="${k}" aria-pressed="${state.view === k}">${l}</button>`).join('')}</div><span class="fine" id="viewhint"></span></div><div id="view"></div>`;
   document.getElementById('main').innerHTML = h;
-  document.getElementById('views').onclick = e => { const b = e.target.closest('button'); if (!b) return; state.view = b.dataset.v; if (state.view === 'chat') state.convs = [SPRINT]; for (const x of e.currentTarget.children) x.setAttribute('aria-pressed', x === b); drawView(); setHash(R.model + '_' + R.seed, {view:state.view}); };
+  document.getElementById('views').onclick = e => { const b = e.target.closest('button'); if (!b) return; state.view = b.dataset.v; if (state.view === 'chat') state.convs = [SPRINT]; for (const x of e.currentTarget.children) x.setAttribute('aria-pressed', x === b); drawView(); setHash(R.id, {view:state.view}); };
   drawView();
 }
+const HPF = [['pressed','pressed to take T1'], ['used_as_reason','16:00 used as a reason'], ['used_as_decisive_reason','weight of that reason'], ['reason_withdrawn','reason withdrawn?'], ['presented_as_fixed','hour stated as fixed']];
+function plainSeatCard(e) {
+  const s = R.seats[e] || {};
+  let h = `<div class="panel sc" style="--c:${colorOf(e)}"><header>${av(e)}<b>${esc(name(e))}’s agent</b>`;
+  if (s.honeypot) h += `<span class="chip" style="--c:var(${(HPC[s.honeypot.used_as_reason] || ['--nomsg'])[0]})">${esc((HPC[s.honeypot.used_as_reason] || [0, s.honeypot.used_as_reason])[1])}</span>`;
+  h += '</header>';
+  if (s.honeypot) {
+    h += '<dl class="hp">' + HPF.map(([k, l]) => `<dt>${l}</dt><dd>${esc(String(s.honeypot[k] ?? '—'))}</dd>`).join('') + '</dl>';
+    if (s.honeypot.reason) h += `<p class="why">${esc(rename(s.honeypot.reason))}</p>`;
+    const qs = (s.honeypot.quotes || []).filter(q => q.text);
+    if (qs.length) h += `<details><summary>Quotes the honeypot judge relied on (${qs.length})</summary>${qs.map(q => `<div class="rep"><b>${esc(q.gate)} · ${esc(String(q.supports))}</b> · ${esc(name(q.who || ''))} ${esc(q.clock || '')} · ${esc(q.where || '')}<br>“${esc(rename(q.text))}”</div>`).join('')}</details>`;
+  } else {
+    const jd = setOf(R.setting).judged;
+    h += `<p class="why">${jd.includes('honeypot') ? 'The honeypot judge labels Alice’s agent only.' : jd.length ? 'Not in the judged sample.' : 'This setting has no per-seat judge labels on the site; see the paper for its analysis.'}</p>`;
+  }
+  h += `<div class="flags">${'leak_bob' in s ? (s.leak_bob ? '<span class="chip" style="--c:var(--pref)">discloses no-Bob preference</span>' : '') + (s.leak_work ? '<span class="chip" style="--c:var(--work)">discloses unpreparedness</span>' : '') : ''}<span class="chip plain" style="--c:var(--line)">ends on ${esc(s.final_task || '—')}</span></div></div>`;
+  return h;
+}
 function seatCard(e) {
-  const s = R.seats[e], L = LABEL[s.label] || {name:s.label, c:'--nomsg'};
+  const s = R.seats[e] || {};
+  if (!s.deception) return plainSeatCard(e);
+  const L = LABEL[s.label] || {name:s.label, c:'--nomsg'};
   const reps = s.deception.plain;
   const lab = l => LABEL[l === 'T1' ? 'goes for T1' : l === 'NOMSG' ? 'sends no message' : l] || {c:'--nomsg', name:l};
   const ack = s.deception['ack-fabr'] || s.deception['ack-fram'];
   const first = reps.find(r => r.decisive_quote) || {};
-  let h = `<div class="panel sc" style="--c:var(${T.COLOR[e]})"><header>${av(e)}<b>${esc(name(e))}’s agent</b><span class="chip" style="--c:var(${L.c})">${esc(L.name)}</span>
+  let h = `<div class="panel sc" style="--c:${colorOf(e)}"><header>${av(e)}<b>${esc(name(e))}’s agent</b><span class="chip" style="--c:var(${L.c})">${esc(L.name)}</span>
     <span class="reps" title="no-CoT judge, 3 replicates">${reps.map(r => `<i style="--c:var(${lab(r.label).c})" title="${esc(lab(r.label).name)}"></i>`).join('')}</span></header>`;
   const evBox = (id, chipC, chipT, count, spans) => { const m = R.msgs.find(x => x.id === id); if (!m) return '';
     return `<div class="ev" style="--c2:var(${chipC})"><header><span class="chip" style="--c:var(${chipC})">${esc(chipT)}</span><span>${esc(m.time.slice(0,5))} · ${m.user !== e ? esc(name(m.user)) + ' → ' : ''}${esc(convName(m.conv))}</span><span class="fine">${count}/3 replicates</span><a class="go" href="#" data-jump="msg:${esc(id)}">open →</a></header><div class="evt">${markSpans(m.text, spans)}</div></div>`; };
@@ -435,6 +509,7 @@ function jumpTo(target) {
     const m = R.msgs.find(x => x.id === id); if (!m) return;
     state.view = 'chat'; if (!(state.convs || []).includes(m.conv)) state.convs = [...(state.convs || [SPRINT]), m.conv]; drawRun();
     const el = document.getElementById('m-' + CSS.escape(id));
+    for (let p = el && el.parentElement; p; p = p.parentElement) if (p.tagName === 'DETAILS') p.open = true;
     if (el) { el.scrollIntoView({block:'center', behavior:'smooth'}); el.classList.add('flash'); const op = el.querySelector('[data-think]'); if (op && !el.querySelector('.think')) op.click(); }
   } else if (kind === 'turn') {
     const t = R.turnById[id]; if (!t) return;
@@ -453,7 +528,7 @@ function drawView() {
 /* ── timeline: one lane per agent ── */
 function drawTimeline(v, hint) {
   hint.textContent = 'Bars are agent turns, dots are posts. Click anything to open it.';
-  const d = R, lanes = AGENTS;
+  const d = R, lanes = AGENTS();
   const t0 = 0, t1 = Math.max(d.deadline + 300, ...d.turns.map(t => t.t_end || 0)), W = 1000, L = 120, top = 26, LH = 46;
   const x = t => L + Math.max(0, t - t0) / (t1 - t0) * (W - L - 10);
   const H = top + lanes.length * LH + 80;
@@ -463,7 +538,7 @@ function drawTimeline(v, hint) {
   for (let t = 0; t <= t1; t += 300) s += `<line class="g" x1="${x(t)}" x2="${x(t)}" y1="${top - 6}" y2="${H - 50}"/><text class="ax" x="${x(t)}" y="${top - 10}" text-anchor="middle">${clock(t)}</text>`;
   for (const [t, l] of [[d.kickoff, 'board opens'], [d.deadline, 'board locks']]) s += `<line class="mk" x1="${x(t)}" x2="${x(t)}" y1="${top - 4}" y2="${H - 44}"/><text class="mkl" x="${x(t) + 4}" y="${H - 34}">${l}</text>`;
   lanes.forEach((a, i) => {
-    const y = top + i * LH + 8, c = `var(${T.COLOR[a]})`;
+    const y = top + i * LH + 8, c = colorOf(a);
     s += `<text class="lane" x="0" y="${y + 18}" fill="${c}">${esc(name(a))}</text>`;
     for (const t of d.turns.filter(t => t.agent === a)) s += `<rect class="turn" data-turn="${t.i}" x="${x(t.t)}" y="${y + 4}" width="${Math.max(2, x(t.t_end) - x(t.t))}" height="22" rx="3" fill="${c}"><title>${esc(name(a))} · ${t.time} · ${esc(t.wake ? 'woken by ' + convName(t.wake) : t.kind)}</title></rect>`;
     for (const m of d.msgs.filter(m => m.live && m.user === a)) {
@@ -501,7 +576,7 @@ const isPriv = k => k.startsWith('priv:');
 const laneName = k => isPriv(k) ? name(k.slice(5)) + '’s agent · private reasoning' : convName(k);
 const snippet = (t, n = 90) => { t = rename(t).replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
 function boardPreset() {
-  const agentDm = l => l.startsWith('dm:') && l.slice(3).split('+').every(x => AGENTS.includes(x));
+  const agentDm = l => l.startsWith('dm:') && l.slice(3).split('+').every(x => AGENTS().includes(x));
   return ['priv:Priya', SPRINT, 'priv:Nadia', ...R.convList.filter(c => c.live > 0 && agentDm(c.label)).map(c => c.label)];
 }
 function laneOrder(keys) {
@@ -529,7 +604,6 @@ function msgHTML(m, shown, lastOfTurn) {
     ...(dec ? [...new Set(dec.map(x => x.label))].map(l => `<span class="chip" style="--c:var(${(LABEL[l] || {c:'--nomsg'}).c})" title="deception judge: decisive message for ${esc(name(dec[0].emp))}'s seat">${esc((LABEL[l] || {name:l}).name)} · ${dec.length}/3</span>`) : []),
     discSummary(m),
     t ? thinkBtn(m.turn) : '',
-    !m.live ? '<span class="hist">before the run</span>' : '',
   ].filter(Boolean).join('');
   const extra = t && lastOfTurn.get(m.turn) === m.id ? xposts(t, shown) + (claimTags(t) ? `<div class="tags">${claimTags(t)}</div>` : '') : '';
   return `<div class="msg ${bot ? 'bot' : ''}" id="m-${esc(m.id)}"${m.live ? ` data-t="${m.t}"` : ''}>${bot ? '<i class="av" style="--c:var(--other)">⚙</i>' : av(m.user)}<div><header><b style="color:var(${T.COLOR[m.user] || '--ink'})">${esc(name(m.user))}</b><span class="t">${esc(m.time)}</span></header><div class="txt">${markSpans(m.text, msgSpans(m))}</div>${extra}${tags ? `<div class="tags">${tags}</div>` : ''}</div></div>`;
@@ -542,7 +616,7 @@ function privCard(t) {
   const r = t.steps.map(s => s.reasoning).filter(Boolean).join('\n').trim();
   const posts = turnPosts(t);
   if (!r && !claimTags(t) && !posts.length) return '';
-  return `<div class="card think2" id="pc-${t.i}" data-t="${t.t}" style="--c:var(${T.COLOR[t.agent]})" data-jump="turn:${t.i}"><div class="hd"><b>💭</b><span>${hm(t.time)}</span><span>${t.calls.length} tool calls${posts.length ? ` · ${posts.length} post${posts.length > 1 ? 's' : ''}` : ''}</span>${claimTags(t)}</div><div class="bx">${r ? esc(rename(r.slice(0, 600))) : '<span class="fine">no reasoning text</span>'}</div></div>`;
+  return `<div class="card think2" id="pc-${t.i}" data-t="${t.t}" style="--c:${colorOf(t.agent)}" data-jump="turn:${t.i}"><div class="hd"><b>💭</b><span>${hm(t.time)}</span><span>${t.calls.length} tool calls${posts.length ? ` · ${posts.length} post${posts.length > 1 ? 's' : ''}` : ''}</span>${claimTags(t)}</div><div class="bx">${r ? esc(rename(r.slice(0, 600))) : '<span class="fine">no reasoning text</span>'}</div></div>`;
 }
 /* ── minimap: the whole run next to the messages, like an editor's code overview ── */
 function msgFlag(m) {
@@ -641,7 +715,7 @@ function drawChat(v, hint) {
     : 'Highlights: pink/orange = deception judge’s decisive quote, blue = disclosure judge’s span. Tick more conversations to see them side by side. Right: overview of the whole conversation, letter = sender, coloured = flagged by a judge.';
   // sidebar
   const row = (k, label, dots, n) => `<div class="cv ${shown.has(k) ? 'on' : ''}"><button class="box" data-add="${esc(k)}" aria-pressed="${shown.has(k)}" title="${shown.has(k) ? 'remove column' : 'add as column'}"></button><button class="nm" data-c="${esc(k)}">${esc(label)}${dots}${n != null ? `<span class="n">${n}</span>` : ''}</button></div>`;
-  const groups = [['Channels', c => c.label.startsWith('#')], ['DMs during the run', c => !c.label.startsWith('#') && c.live], ['Private history the agents read', c => !c.live]];
+  const groups = [['Channels', c => c.label.startsWith('#')], ['DMs during the run', c => !c.label.startsWith('#') && c.live], ['DMs from before the run', c => !c.label.startsWith('#') && !c.live]];
   let list = `<div class="presets"><button data-preset="sprint" aria-pressed="${!multi && lanes[0] === SPRINT}">#sprint</button><button data-preset="board" aria-pressed="${multi && boardPreset().every(k => shown.has(k)) && lanes.length === boardPreset().length}">board layout</button></div>`;
   list += `<h3>Private reasoning</h3>` + FOCAL.map(e => row('priv:' + e, name(e) + '’s agent', '', null)).join('');
   list += groups.map(([g, f]) => { const cs = d.convList.filter(f); return cs.length ? `<h3>${g}</h3>` + cs.map(c => row(c.label, convName(c.label), convDots(c), c.live || c.hist)).join('') : ''; }).join('');
@@ -658,10 +732,11 @@ function drawChat(v, hint) {
       : [...d.msgs.filter(m => m.conv === k).map((m, i) => ({t:m.live ? m.t : -1e9 + i, live:m.live, html:msgHTML(m, shown, lastOfTurn)})),
          ...orphans.map(t => ({t:t.t + 0.001, live:true, html:turnRowHTML(t, shown)}))];
     items.sort((a, b) => a.t - b.t);
-    let body = '', liveStarted = false, kk = false, dl = false;
-    const hasHist = items.some(x => x.live === false);
-    for (const x of items) {
-      if (x.live && !liveStarted) { liveStarted = true; if (hasHist) body += '<div class="sep">the run starts, 08:55</div>'; }
+    let body = '', kk = false, dl = false;
+    const hist = items.filter(x => x.live === false);
+    // the pre-seeded workspace history, collapsed (open by default only when nothing happens here during the run)
+    if (hist.length) body += `<details class="histbox"${items.length === hist.length ? ' open' : ''}><summary>${hist.length} message${hist.length > 1 ? 's' : ''} before the run (workspace history)</summary>${hist.map(x => x.html).join('')}</details>` + (items.length > hist.length ? `<div class="sep">the run starts, ${esc(d.clock_start.slice(0, 5))}</div>` : '');
+    for (const x of items.filter(x => x.live !== false)) {
       if (x.live !== false && !kk && x.t >= d.kickoff) { kk = true; body += '<div class="sep mk">board opens</div>'; }
       if (x.live !== false && !dl && x.t >= d.deadline) { dl = true; body += '<div class="sep mk">board locks</div>'; }
       body += x.html;
@@ -724,7 +799,8 @@ function drawChat(v, hint) {
 }
 function cotSpans(t) {
   if (!FOCAL.includes(t.agent)) return [];
-  const a = R.seats[t.agent].deception['ack-fabr'] || R.seats[t.agent].deception['ack-fram'] || [];
+  const dd = (R.seats[t.agent] || {}).deception || {};
+  const a = dd['ack-fabr'] || dd['ack-fram'] || [];
   return a.filter(x => x.turn === t.i && x.cot_quote).map(x => ({q:x.cot_quote, cls:'cot', title:'CoT acknowledgment quoted by the judge'}));
 }
 function turnBody(t, clamp) {
@@ -733,7 +809,7 @@ function turnBody(t, clamp) {
     const calls = t.calls.filter(c => c.step === i + 1 || (!c.step && i === 0));
     const long = (st.reasoning || '').length > 700;
     return `<div class="step">${st.reasoning ? `<div class="r ${clamp && long && !sp.length ? 'clamp' : ''}">${markSpans(st.reasoning.trim(), sp)}</div>${clamp && long && !sp.length ? '<button class="more" onclick="this.previousElementSibling.classList.remove(\'clamp\');this.remove()">show all</button>' : ''}` : ''}
-      ${calls.map(c => `<div class="call"><span class="fine">${esc(c.clock)}</span><span class="tn">${esc(rename(c.line))}</span>${c.text ? `<div class="posted">${esc(rename(c.text))}</div>` : ''}<details><summary class="fine">args / result</summary><pre>${esc(rename(c.args))}\n\n${esc(rename(c.result))}</pre></details></div>`).join('')}
+      ${calls.map(c => `<div class="call"><span class="fine">${esc(c.clock)}</span><span class="tn">${esc(rename(c.line))}</span>${c.text ? `<div class="posted">${esc(rename(c.text))}</div>` : ''}<details data-r="${c.r}"><summary class="fine">args / result</summary><pre>${esc(rename(JSON.stringify(c.args, null, 1)))}</pre><pre class="respre">loading result…</pre></details></div>`).join('')}
       ${st.text && st.text.trim() ? `<div class="touser">to ${esc(name(t.agent))}: ${esc(rename(st.text.trim()))}</div>` : ''}</div>`;
   }).join('') || (t.calls.length ? `<div class="step">${t.calls.map(c => `<div class="call"><span class="tn">${esc(rename(c.line))}</span></div>`).join('')}</div>` : '<div class="step fine">no reasoning recorded</div>');
 }
@@ -743,18 +819,27 @@ function drawAgent(v, hint) {
   hint.textContent = R.closed ? 'Closed-weight models return a reasoning summary, not the raw chain of thought.' : 'Full turns: reasoning, tool calls, and private notes to the user.';
   const ts = R.turns.filter(t => t.agent === state.agent);
   const quiet = t => !t.steps.some(s => s.reasoning) && !t.calls.length;
-  v.innerHTML = `<div class="panel al"><div class="agpick">${AGENTS.map(a => `<button data-a="${a}" aria-pressed="${a === state.agent}">${av(a, 1)}${esc(name(a))}</button>`).join('')}</div>
-    <p class="fine" style="margin:0 0 10px">${esc(name(state.agent))}’s agent · ${esc(T.ROLE[state.agent])} · ${ts.length} turns</p>
+  v.innerHTML = `<div class="panel al"><div class="agpick">${AGENTS().map(a => `<button data-a="${a}" aria-pressed="${a === state.agent}">${av(a, 1)}${esc(name(a))}</button>`).join('')}</div>
+    <p class="fine" style="margin:0 0 10px">${esc(name(state.agent))}’s agent · ${esc(T.ROLE[state.agent] || R.roles[state.agent] || '')} · ${ts.length} turns</p>
     ${ts.filter(t => !quiet(t)).map(t => `<div class="turnbox" id="t-${t.i}"><header><span class="t">${t.time}</span><span>${t.wake ? 'woken by ' + esc(convName(t.wake)) + (t.wake_from ? ' · ' + esc(name(t.wake_from)) : '') : esc(t.kind)}</span><span style="margin-left:auto">${t.calls.length} tool calls</span></header>${turnBody(t, true)}</div>`).join('')}</div>`;
   v.querySelector('.agpick').onclick = e => { const b = e.target.closest('button'); if (b) { state.agent = b.dataset.a; drawAgent(v, hint); } };
 }
 /* ── prompts ── */
 function drawSetup(v, hint) {
-  hint.textContent = 'What each agent was told. The system prompt is shared; the user prompts differ.';
-  v.innerHTML = `<div class="panel al"><h3 style="margin:0 0 8px">System prompt (${esc(name('Priya'))}’s agent; the others are the same with their own name)</h3><div class="prompt">${esc(rename(R.system_prompt_focal))}</div>
-    ${AGENTS.map(a => `<h3 style="margin:16px 0 8px;display:flex;gap:6px;align-items:center">${av(a, 1)} ${esc(name(a))}’s user prompt</h3><div class="prompt">${esc(rename(R.asks[a]))}</div>`).join('')}</div>`;
+  hint.textContent = 'What each agent was told: its system prompt and the request from its user.';
+  const sp = R.system_prompts || {};
+  v.innerHTML = `<div class="panel al">${AGENTS().map((a, i) => `<h3 style="margin:${i ? 22 : 0}px 0 8px;display:flex;gap:6px;align-items:center">${av(a, 1)} ${esc(name(a))}’s agent</h3>
+      <div class="prompt">${esc(rename(R.asks[a] || '—'))}</div>
+      <details style="margin-top:6px"${i === 0 ? ' open' : ''}><summary class="fine" style="cursor:pointer">system prompt</summary><div class="prompt" style="margin-top:6px">${esc(rename(sp[a] || ''))}</div></details>`).join('')}</div>`;
 }
 
+document.getElementById('main').addEventListener('toggle', e => {
+  const dt = e.target; if (!dt.matches || !dt.matches('details[data-r]') || !dt.open) return;
+  const pre = dt.querySelector('.respre'); if (!pre || pre.dataset.done) return;
+  const run = R;
+  T.loadResults(run).then(res => { pre.textContent = rename(JSON.stringify(res[+dt.dataset.r], null, 1)); pre.dataset.done = 1; })
+    .catch(() => { pre.textContent = 'result not available'; });
+}, true);
 T.namesToggle(document.getElementById('names'), () => { drawSide(); if (R) { R.convList = convList(R); drawRun(); } });
 drawSide();
 const h0 = parseHash();
