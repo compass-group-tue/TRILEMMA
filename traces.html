@@ -538,6 +538,7 @@ function drawTimeline(v, hint) {
   let s = '';
   for (let t = 0; t <= t1; t += 300) s += `<line class="g" x1="${x(t)}" x2="${x(t)}" y1="${top - 6}" y2="${H - 50}"/><text class="ax" x="${x(t)}" y="${top - 10}" text-anchor="middle">${clock(t)}</text>`;
   for (const [t, l] of [[d.kickoff, 'board opens'], [d.deadline, 'board locks']]) s += `<line class="mk" x1="${x(t)}" x2="${x(t)}" y1="${top - 4}" y2="${H - 44}"/><text class="mkl" x="${x(t) + 4}" y="${H - 34}">${l}</text>`;
+  let front = '', rings = '';   // labelled messages are drawn after every plain dot, so nothing covers them
   lanes.forEach((a, i) => {
     const y = top + i * LH + 8, c = 'var(--ink-3)';   // lanes stay neutral: in the timeline, colour means a judge label
     s += `<text class="lane" x="0" y="${y + 18}" fill="var(--ink)">${esc(name(a))}</text>`;
@@ -547,12 +548,13 @@ function drawTimeline(v, hint) {
       const tip = `<title>${esc(m.time)} → ${esc(convName(m.conv))}${dec ? ' · ' + esc((LABEL[dec[0].label] || {name:dec[0].label}).name) : ''}: ${esc(rename(m.text.slice(0, 160)))}</title>`;
       if (dec) {   // the judge's decisive message: a diamond with an ink outline, so it can't be mistaken for a lane-coloured post
         const cx = x(m.t), cy = y + 15, r = 8.5;
-        s += `<path class="post dec" data-msg="${esc(m.id)}" d="M${cx},${cy - r}L${cx + r},${cy}L${cx},${cy + r}L${cx - r},${cy}Z" fill="var(${(LABEL[dec[0].label] || {c:'--nomsg'}).c})">${tip}</path>`;
+        front += `<path class="post dec" data-msg="${esc(m.id)}" d="M${cx},${cy - r}L${cx + r},${cy}L${cx},${cy + r}L${cx - r},${cy}Z" fill="var(${(LABEL[dec[0].label] || {c:'--nomsg'}).c})">${tip}</path>`;
       } else s += `<circle class="post" data-msg="${esc(m.id)}" cx="${x(m.t)}" cy="${y + 15}" r="5" fill="${m.conv === SPRINT ? c : 'var(--surface)'}" ${m.conv !== SPRINT ? `stroke="${c}" style="stroke-width:2"` : ''}>${tip}</circle>`;
-      if (disc) s += `<circle cx="${x(m.t)}" cy="${y + 15}" r="11" fill="none" stroke="var(--pref)" stroke-width="2.5" pointer-events="none"/>`;
+      if (disc) rings += `<circle cx="${x(m.t)}" cy="${y + 15}" r="11" fill="none" stroke="var(--pref)" stroke-width="2.5" pointer-events="none"/>`;
     }
     for (const b of d.board.filter(b => b.agent === a)) s += `<g><rect x="${x(b.t) - 11}" y="${y - 6}" width="22" height="12" rx="3" fill="${b.task === 'T1' ? 'var(--t1)' : b.task === 'T2' ? 'var(--task)' : 'var(--ink-3)'}"/><text class="claim" x="${x(b.t)}" y="${y + 3}" text-anchor="middle">${esc(b.task)}</text><title>${esc(name(a))} claims ${esc(b.task)} on the board at ${esc(b.time)}</title></g>`;
   });
+  s += front + rings;
   // board state strip: which ticket each data scientist holds over time
   const yb = top + lanes.length * LH + 4;
   s += `<text class="lane" x="0" y="${yb + 12}" fill="var(--ink-2)">board</text>`;
