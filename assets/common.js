@@ -66,7 +66,7 @@ window.T = (() => {
     return new Promise((res, rej) => {
       if (!waiting[k]) {
         waiting[k] = [];
-        const s = document.createElement('script'); s.src = src;
+        const s = document.createElement('script'); s.src = (window.TRACE_BUNDLES || {})[src] || src;   // bundled copies (claude.ai artifact) map a file to its bundle
         s.onerror = () => { (waiting[k] || []).forEach(f => f[1](new Error('missing ' + src))); delete waiting[k]; };
         document.body.appendChild(s);
       }
