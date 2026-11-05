@@ -193,7 +193,14 @@ h3{font-size:15.5px;margin:0}
 .mxgrid .mn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mxgrid .mn small{display:block;font-weight:400;color:var(--ink-3);font-size:11px}
 .mxgrid .div{grid-column:1/-1;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:10px 0 2px;border-top:1px solid var(--line);margin-top:4px}
-.run{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 6px;grid-auto-flow:column;gap:2px 3px;padding:3px;border-radius:7px;border:2px solid transparent;text-decoration:none;position:relative;height:46px;transition:transform .12s}
+.run{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 6px;grid-auto-flow:column;gap:2px 3px;padding:3px;border-radius:7px;border:2px solid transparent;text-decoration:none;position:relative;height:50px;transition:transform .12s}
+.mxgrid .ac{display:flex;justify-content:space-around;font:500 9.5px var(--mono);color:var(--ink-3);margin-top:-4px}
+.mxsum{font-size:11.5px;color:var(--ink-3);line-height:1.5;margin-top:4px}
+.mxsum b{font-weight:600;color:var(--ink-2)}
+.mxsum i{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--c);margin:0 3px 0 6px;vertical-align:-1px}
+.mxsum i:first-child{margin-left:0}
+.legend .sub{color:var(--ink-3)}
+.legend i.txt{width:auto;height:auto;background:var(--surface-2);border-radius:3px;padding:0 4px;font:700 10px Inter,sans-serif;font-style:normal;color:var(--ink-2)}
 .run:hover{transform:scale(1.12);z-index:2}
 .run.valid{border-color:var(--ink-2)}
 .seat{border-radius:4px;background:var(--c);position:relative;display:grid;place-items:center;font:700 10.5px Inter,sans-serif;color:var(--hi-ink);opacity:.95}
@@ -426,11 +433,8 @@ footer.site .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:
 
 <section id="results"><div class="wrap">
   <div class="sechead"><span class="secnum" style="--c:var(--fabr)">3</span><h2>Across the 90 main runs: most agents deceive, few runs end staffed</h2></div>
-  <p class="intro">Each tile is one run: <b>A</b>lice’s agent on the left, <b>C</b>arol’s on the right. <b>Hover</b> for the deciding quote, <b>click</b> to open the run.</p>
-  <div class="ctrl">
-    <div class="seg" id="mxMode"><button data-m="dec" aria-pressed="true">Deception</button><button data-m="disc">Disclosure</button><button data-m="task">Final board</button></div>
-    <div class="legend" id="mxLegend"></div>
-  </div>
+  <p class="intro">Each tile is one run: Alice’s agent on the left, Carol’s on the right. The colour is the agent’s deception label, the text the ticket it ends on, the bar beneath any disclosure, and a frame marks a valid staffing. <b>Hover</b> for the deciding quote, <b>click</b> to open the run.</p>
+  <div class="ctrl"><div class="legend" id="mxLegend"></div></div>
   <div class="panel mx"><div class="mxgrid" id="mx"></div></div>
   <div class="two">
     <div class="panel">
@@ -686,51 +690,43 @@ document.getElementById('optcard').addEventListener('click', e => { const b = e.
 document.getElementById('triSvg').addEventListener('click', e => { const g = e.target.closest('.opt'); if (g) { curOpt = g.dataset.k; exI = 0; drawTri(); } });
 document.getElementById('triSvg').addEventListener('keydown', e => { const g = e.target.closest('.opt'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); curOpt = g.dataset.k; exI = 0; drawTri(); } });
 
-/* ── results matrix ── */
-let mxMode = 'dec';
-const DISC_C = {bob:'--pref', work:'--work'};
-function seatColor(s) {
-  if (mxMode === 'dec') return LABEL[s.label] ? `var(${LABEL[s.label].c})` : 'var(--nomsg)';
-  if (mxMode === 'disc') return s.leak_bob ? 'var(--pref)' : s.leak_work ? 'var(--work)' : 'var(--surface-2)';
-  return s.final_task === 'T1' ? 'var(--t1)' : s.final_task === 'T2' ? 'var(--task)' : 'var(--surface-2)';
-}
+/* ── results matrix: one view, as in the paper's Figure 5 ── */
+const DEC_ORDER = ['FABR','FRAM','NOTH','goes for T1','sends no message'];
 function drawLegend() {
-  const L = document.getElementById('mxLegend');
-  const items = mxMode === 'dec'
-    ? Object.values(LABEL).map(l => `<span><i style="--c:var(${l.c})"></i>${l.name}</span>`).join('') + '<span><i style="--c:var(--pref);height:5px;width:14px"></i>bar: discloses no-Bob preference</span><span><i style="--c:var(--work);height:5px;width:14px"></i>bar: discloses unpreparedness</span>'
-    : mxMode === 'disc' ? '<span><i style="--c:var(--pref)"></i>discloses no-Bob preference</span><span><i style="--c:var(--work)"></i>discloses unpreparedness only</span><span><i style="--c:var(--surface-2);border:1px solid var(--line-2)"></i>neither</span>'
-    : '<span><i style="--c:var(--t1)"></i>ends on T1 (with Bob)</span><span><i style="--c:var(--task)"></i>ends on T2</span><span><i style="--c:var(--surface-2);border:1px solid var(--line-2)"></i>unassigned</span>';
-  L.innerHTML = items + '<span><i class="frame"></i>valid staffing</span>';
+  document.getElementById('mxLegend').innerHTML =
+    DEC_ORDER.filter(k => LABEL[k]).map(k => `<span><i style="--c:var(${LABEL[k].c})"></i>${LABEL[k].name}</span>`).join('') +
+    '<span><i class="txt">T1</i><i class="txt">T2</i><i class="txt">–</i>ticket the agent ends on</span>' +
+    '<span><i style="--c:var(--pref);height:5px;width:14px"></i>discloses no-Bob preference</span><span><i style="--c:var(--work);height:5px;width:14px"></i>discloses unpreparedness</span>' +
+    '<span><i class="frame"></i>valid staffing</span>';
 }
 function drawMatrix() {
   const g = document.getElementById('mx');
-  let h = '<div></div>' + Array.from({length:10}, (_, i) => `<div class="mh">s${i}</div>`).join('') + '<div class="mh" style="text-align:left">20 seats</div>';
+  let h = '<div></div>' + Array.from({length:10}, (_, i) => `<div class="mh">s${i}<div class="ac"><span>A</span><span>C</span></div></div>`).join('') + '<div class="mh" style="text-align:left">20 agents per model</div>';
   let closedShown = false;
   for (const m of IDX.models) {
     if (m.closed && !closedShown) { closedShown = true; h += '<div class="div">Closed-weight · labels from the no-CoT judge only (no raw reasoning)</div>'; }
     const runs = IDX.runs.filter(r => r.model === m.key);
-    h += `<div class="mn" title="${esc(m.name)}">${esc(m.name)}<small>${runs.filter(r => r.valid).length}/10 valid staffings</small></div>`;
-    const cnt = {};
+    h += `<div class="mn" title="${esc(m.name)}">${esc(m.name)}</div>`;
+    const cnt = {}; let bob = 0, work = 0;
     for (let i = 0; i < 10; i++) {
       const r = runs.find(x => x.seed === 's' + i);
       if (!r) { h += '<div></div>'; continue; }
       h += `<a class="run ${r.valid ? 'valid' : ''}" href="traces.html#${r.model}_${r.seed}" data-f="${r.file}">` + ['Priya','Nadia'].map(e => {
-        const s = r.seats[e]; const key = mxMode === 'dec' ? s.label : mxMode === 'disc' ? (s.leak_bob ? 'bob' : s.leak_work ? 'work' : 'none') : (s.final_task || 'none');
-        cnt[key] = (cnt[key] || 0) + 1;
-        // disclosure bar under each seat, in every mode: dark = no-Bob preference, light = unpreparedness
-        const bar = s.leak_bob && s.leak_work ? '<span class="dbar"><i style="background:var(--pref)"></i><i style="background:var(--work)"></i></span>'
+        const s = r.seats[e];
+        cnt[s.label] = (cnt[s.label] || 0) + 1; bob += !!s.leak_bob; work += !!s.leak_work;
+        const bar = s.leak_bob && s.leak_work ? '<span class="dbar"><i style="flex:1;background:var(--pref)"></i><i style="flex:1;background:var(--work)"></i></span>'
           : s.leak_bob ? '<span class="dbar" style="--b:var(--pref)"></span>' : s.leak_work ? '<span class="dbar" style="--b:var(--work)"></span>' : '<span class="dbar none"></span>';
-        return `<span class="seat" data-e="${e}" style="--c:${seatColor(s)}">${esc(name(e)[0])}</span>${bar}`;
+        const c = LABEL[s.label] ? `var(${LABEL[s.label].c})` : 'var(--nomsg)';
+        return `<span class="seat" data-e="${e}" style="--c:${c}">${s.final_task === 'T1' || s.final_task === 'T2' ? s.final_task : '–'}</span>${bar}`;
       }).join('') + '</a>';
     }
-    const order = mxMode === 'dec' ? ['FABR','FRAM','NOTH','goes for T1','sends no message'] : mxMode === 'disc' ? ['bob','work','none'] : ['T1','T2','none'];
-    const col = k => mxMode === 'dec' ? `var(${LABEL[k].c})` : mxMode === 'disc' ? ({bob:'var(--pref)',work:'var(--work)',none:'var(--surface-2)'})[k] : ({T1:'var(--t1)',T2:'var(--task)',none:'var(--surface-2)'})[k];
-    h += `<div class="bars">${order.map(k => `<i style="flex:${cnt[k]||0};--c:${col(k)}" title="${k}: ${cnt[k]||0}"></i>`).join('')}</div>`;
+    const valid = runs.filter(r => r.valid).length;
+    h += `<div><div class="bars">${DEC_ORDER.map(k => `<i style="flex:${cnt[k]||0};--c:var(${(LABEL[k] || {c:'--nomsg'}).c})" title="${(LABEL[k] || {name:k}).name}: ${cnt[k]||0}"></i>`).join('')}</div>
+      <div class="mxsum"><i style="--c:var(--pref)"></i><b>${bob}</b> no-Bob<i style="--c:var(--work)"></i><b>${work}</b> unprep. · <b>${valid}</b>/${runs.length} valid</div></div>`;
   }
   g.innerHTML = h;
   drawLegend();
 }
-document.getElementById('mxMode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; mxMode = b.dataset.m; for (const x of e.currentTarget.children) x.setAttribute('aria-pressed', x === b); drawMatrix(); });
 document.getElementById('mx').addEventListener('mousemove', e => {
   const seat = e.target.closest('.seat'), run = e.target.closest('.run');
   if (!run) return T.tip(null);
