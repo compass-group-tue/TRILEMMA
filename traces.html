@@ -86,7 +86,8 @@ svg.tlsvg{display:block;min-width:820px;width:100%}
 .tlsvg .claim{font:600 9.5px var(--mono);fill:var(--hi-ink)}
 .tlnote{font-size:12px;color:var(--ink-3);margin:6px 2px 0;display:flex;flex-wrap:wrap;gap:4px 14px}
 .tlnote span{display:inline-flex;gap:5px;align-items:center}.tlnote i{width:10px;height:10px;border-radius:50%;background:var(--c)}
-.tlnote i.sq{border-radius:2px}.tlnote i.ring{background:none;border:2.5px solid var(--c)}
+.tlnote i.sq{border-radius:2px}.tlnote i.dia{width:9px;height:9px;border-radius:1px;transform:rotate(45deg);box-shadow:0 0 0 1.5px var(--ink);margin:0 2px}
+.tlsvg .post.dec{stroke:var(--ink);stroke-width:1.8}.tlnote i.ring{background:none;border:2.5px solid var(--c)}
 /* chat */
 .chat{display:grid;grid-template-columns:230px minmax(0,1fr) 126px;min-height:600px;overflow:hidden}
 .minimap{border-left:1px solid var(--line);padding:0 4px;align-self:start;cursor:pointer;user-select:none}
@@ -543,8 +544,11 @@ function drawTimeline(v, hint) {
     for (const t of d.turns.filter(t => t.agent === a)) s += `<rect class="turn" data-turn="${t.i}" x="${x(t.t)}" y="${y + 4}" width="${Math.max(2, x(t.t_end) - x(t.t))}" height="22" rx="3" fill="${c}"><title>${esc(name(a))} · ${t.time} · ${esc(t.wake ? 'woken by ' + convName(t.wake) : t.kind)}</title></rect>`;
     for (const m of d.msgs.filter(m => m.live && m.user === a)) {
       const dec = d.decisive[m.id], disc = m.disc && discSummary(m);
-      const fill = dec ? `var(${(LABEL[dec[0].label] || {c:'--nomsg'}).c})` : m.conv === SPRINT ? c : 'var(--surface)';
-      s += `<circle class="post" data-msg="${esc(m.id)}" cx="${x(m.t)}" cy="${y + 15}" r="${dec ? 7 : 5}" fill="${fill}" ${m.conv !== SPRINT ? `stroke="${c}" style="stroke-width:2"` : ''}><title>${esc(m.time)} → ${esc(convName(m.conv))}: ${esc(rename(m.text.slice(0, 160)))}</title></circle>`;
+      const tip = `<title>${esc(m.time)} → ${esc(convName(m.conv))}${dec ? ' · ' + esc((LABEL[dec[0].label] || {name:dec[0].label}).name) : ''}: ${esc(rename(m.text.slice(0, 160)))}</title>`;
+      if (dec) {   // the judge's decisive message: a diamond with an ink outline, so it can't be mistaken for a lane-coloured post
+        const cx = x(m.t), cy = y + 15, r = 8.5;
+        s += `<path class="post dec" data-msg="${esc(m.id)}" d="M${cx},${cy - r}L${cx + r},${cy}L${cx},${cy + r}L${cx - r},${cy}Z" fill="var(${(LABEL[dec[0].label] || {c:'--nomsg'}).c})">${tip}</path>`;
+      } else s += `<circle class="post" data-msg="${esc(m.id)}" cx="${x(m.t)}" cy="${y + 15}" r="5" fill="${m.conv === SPRINT ? c : 'var(--surface)'}" ${m.conv !== SPRINT ? `stroke="${c}" style="stroke-width:2"` : ''}>${tip}</circle>`;
       if (disc) s += `<circle cx="${x(m.t)}" cy="${y + 15}" r="11" fill="none" stroke="var(--pref)" stroke-width="2.5" pointer-events="none"/>`;
     }
     for (const b of d.board.filter(b => b.agent === a)) s += `<g><rect x="${x(b.t) - 11}" y="${y - 6}" width="22" height="12" rx="3" fill="${b.task === 'T1' ? 'var(--t1)' : b.task === 'T2' ? 'var(--task)' : 'var(--ink-3)'}"/><text class="claim" x="${x(b.t)}" y="${y + 3}" text-anchor="middle">${esc(b.task)}</text><title>${esc(name(a))} claims ${esc(b.task)} on the board at ${esc(b.time)}</title></g>`;
@@ -559,7 +563,7 @@ function drawTimeline(v, hint) {
     s += `<text class="ax" x="${L - 8}" y="${yb + k * 13 + 7}" text-anchor="end">${esc(name(e))}</text>`;
   });
   v.innerHTML = `<div class="panel tl"><svg class="tlsvg" viewBox="0 0 ${W} ${H}">${s}</svg>
-    <div class="tlnote"><span><i style="--c:var(--ink-2)"></i>post in #sprint</span><span><i class="ring" style="--c:var(--ink-2)"></i>DM</span><span><i style="--c:var(--fabr)"></i>decisive message: false claim</span><span><i style="--c:var(--fram)"></i>misdirection</span><span><i class="ring" style="--c:var(--pref)"></i>disclosure</span><span><i class="sq" style="--c:var(--t1)"></i>claims T1</span><span><i class="sq" style="--c:var(--task)"></i>claims T2</span></div></div>`;
+    <div class="tlnote"><span><i style="--c:var(--ink-2)"></i>post in #sprint</span><span><i class="ring" style="--c:var(--ink-2)"></i>DM</span><span><i class="dia" style="--c:var(--fabr)"></i>decisive message: false claim</span><span><i class="dia" style="--c:var(--fram)"></i>misdirection</span><span><i class="ring" style="--c:var(--pref)"></i>disclosure</span><span><i class="sq" style="--c:var(--t1)"></i>claims T1</span><span><i class="sq" style="--c:var(--task)"></i>claims T2</span></div></div>`;
   v.querySelector('svg').addEventListener('click', e => {
     const m = e.target.closest('[data-msg]'), t = e.target.closest('[data-turn]');
     if (m) jumpTo('msg:' + m.dataset.msg); else if (t) jumpTo('turn:' + t.dataset.turn);
