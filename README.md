@@ -1,6 +1,6 @@
 # TRILEMMA project site (draft)
 
-Site: https://compass-group-tue.github.io/TRILEMMA/ (once GitHub Pages is enabled) · Code: https://github.com/compass-group-tue/TRILEMMA-ENV
+Site: https://compass-group-tue.github.io/TRILEMMA/ · Paper: https://arxiv.org/abs/2611.08312 · Code: https://github.com/compass-group-tue/TRILEMMA-ENV
 
 Static site for the paper *TRILEMMA: How Agents Choose Between Honesty, Confidentiality, and Task Completion*.
 No build tools or server needed: open `index.html` directly, or serve the folder (GitHub Pages works as is).
