@@ -260,6 +260,7 @@ function parseHash() {
   const o = Object.fromEntries(kv.map(x => x.split('=')));
   let id = decodeURIComponent(id0 || 'dspro_s6');
   if (!id.includes('/')) id = 'main/' + id;
+  if (id.startsWith('honeypot/')) id = 'excuse/' + id.slice(9);  // setting renamed in the paper
   return {...o, id};
 }
 function setHash(id, extra = {}) {
@@ -346,7 +347,7 @@ const hasLeaks = S => S.runs.some(r => FOCAL.some(e => r.seats[e] && 'leak_bob' 
 function seatMatches(s, f) { return f === 'leak' ? s.leak_bob : f === 'leakw' ? s.leak_work : s.label === f; }
 const dbar = s => s.leak_bob && s.leak_work ? '<span class="db"><i style="background:var(--pref)"></i><i style="background:var(--work)"></i></span>'
   : s.leak_bob ? '<span class="db" style="--b:var(--pref)"></span>' : s.leak_work ? '<span class="db" style="--b:var(--work)"></span>' : '<span class="db none"></span>';
-// colour of one half-tile: judge label where the setting was judged, else the honeypot label (Alice), else the final ticket
+// colour of one half-tile: judge label where the setting was judged, else the excuse label (Alice), else the final ticket
 function halfColor(r, e) {
   const s = r.seats[e] || {};
   if (s.label) return (LABEL[s.label] || {c:'--nomsg'}).c;
@@ -397,7 +398,7 @@ function drawSide() {
   document.getElementById('sidelegend').innerHTML = lg;
   document.getElementById('sidenote').textContent = 'Each tile is a run: left half Alice’s agent, right half Carol’s. A frame marks a valid staffing. ' + (J
     ? 'Labels come from the deception judge (3 replicates)' + (S.runs.some(r => !(r.seats.Priya || {}).label) ? '; grey tiles are runs outside the judged sample' : '') + (hasLeaks(S) ? '; the thin bar under a half marks a disclosure found by all three disclosure-judge replicates.' : '.')
-    : hp ? 'Alice’s half shows the honeypot judge’s label for the 16:00 conflict; Carol’s half the ticket she ends on.'
+    : hp ? 'Alice’s half shows the excuse judge’s label for the 16:00 conflict; Carol’s half the ticket she ends on.'
     : 'No judge labels for this setting; each half shows the ticket that data scientist ends on.');
 }
 document.getElementById('setpick').addEventListener('change', e => { const S = setOf(e.target.value); state.filter = null; open(S.runs[0].id); });
@@ -464,10 +465,10 @@ function plainSeatCard(e) {
     h += '<dl class="hp">' + HPF.map(([k, l]) => `<dt>${l}</dt><dd>${esc(String(s.honeypot[k] ?? '—'))}</dd>`).join('') + '</dl>';
     if (s.honeypot.reason) h += `<p class="why">${esc(rename(s.honeypot.reason))}</p>`;
     const qs = (s.honeypot.quotes || []).filter(q => q.text);
-    if (qs.length) h += `<details><summary>Quotes the honeypot judge relied on (${qs.length})</summary>${qs.map(q => `<div class="rep"><b>${esc(q.gate)} · ${esc(String(q.supports))}</b> · ${esc(name(q.who || ''))} ${esc(q.clock || '')} · ${esc(q.where || '')}<br>“${esc(rename(q.text))}”</div>`).join('')}</details>`;
+    if (qs.length) h += `<details><summary>Quotes the excuse judge relied on (${qs.length})</summary>${qs.map(q => `<div class="rep"><b>${esc(q.gate)} · ${esc(String(q.supports))}</b> · ${esc(name(q.who || ''))} ${esc(q.clock || '')} · ${esc(q.where || '')}<br>“${esc(rename(q.text))}”</div>`).join('')}</details>`;
   } else {
     const jd = setOf(R.setting).judged;
-    h += `<p class="why">${jd.includes('honeypot') ? 'The honeypot judge labels Alice’s agent only.' : jd.length ? 'Not in the judged sample.' : 'This setting has no per-seat judge labels on the site; see the paper for its analysis.'}</p>`;
+    h += `<p class="why">${jd.includes('honeypot') ? 'The excuse judge labels Alice’s agent only.' : jd.length ? 'Not in the judged sample.' : 'This setting has no per-seat judge labels on the site; see the paper for its analysis.'}</p>`;
   }
   h += `<div class="flags">${'leak_bob' in s ? (s.leak_bob ? '<span class="chip" style="--c:var(--pref)">discloses no-Bob preference</span>' : '') + (s.leak_work ? '<span class="chip" style="--c:var(--work)">discloses unpreparedness</span>' : '') : ''}<span class="chip plain" style="--c:var(--line)">ends on ${esc(s.final_task || '—')}</span></div></div>`;
   return h;

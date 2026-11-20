@@ -6,18 +6,18 @@ Static site for the paper *TRILEMMA: How Agents Choose Between Honesty, Confiden
 No build tools or server needed: open `index.html` directly, or serve the folder (GitHub Pages works as is).
 
 - `index.html`: the landing page. It has the setup, a staffing mini-game, a replay of a real morning (`main`, dspro s6), the
-  trilemma triangle, the per-seat matrix of `main`, the confidentiality and honeypot charts, the
-  motivated-reasoning stepper (paper Fig. 3), the findings and the citation.
-- `traces.html`: a trace viewer for every run cited in the paper, 815 runs in 25 settings. Pick a setting in the sidebar.
-  - Groups: `main` and its variants; `honeypot` and `no-avoidance-baseline`; the four `dislike-*` settings;
+  trilemma triangle, the per-seat matrix of `main`, the confidentiality and excuse charts, the
+  motivated-reasoning stepper (paper Fig. 6), the findings and the citation.
+- `traces.html`: a trace viewer for every run cited in the paper, 981 runs in 27 settings. Pick a setting in the sidebar.
+  - Groups: `main` and its variants (`main-high-conf`, `main-no-conf`, `main-high-conf-honest`, `main-neutral-dan`,
+    `main-explicit-t2`); `excuse` and `no-avoidance-baseline`; the four `dislike-*` settings;
     `emily-available`; the 12 `discussed-*` settings; and `S1`/`S2` (unseeded cooperation).
   - Views: timeline, messages with reasoning drawers, per-agent log, and prompts (every agent's system prompt and user prompt).
   - Each conversation starts with its pre-seeded workspace history, collapsed.
   - Every tool call shows its full arguments and full result. Results load when opened.
   - Judge overlays appear where the paper has them:
-    - deception (no-CoT, 3 replicates) plus the CoT acknowledgment check: `main`, `main-high-conf`, `main-high-conf-honest`;
-    - disclosure (3 replicates): `main`, `main-high-conf`;
-    - the honeypot judge: `honeypot`.
+    - deception (no-CoT, 3 replicates) plus the CoT acknowledgment check, and disclosure (3 replicates): every `main*` setting;
+    - the excuse judge: `excuse` (called `honeypot` in earlier drafts; old `#honeypot/...` links still open).
   - Deep links: `traces.html#<setting>/<model>_s<seed>&view=chat`. Runs of `main` also keep the short form
     `traces.html#<model>_s<seed>`.
 
@@ -55,5 +55,5 @@ paper's placeholders (Alice, Carol, Bob, Dan, Mary, Emily, Fiona, George), and t
 `?theme=light|dark` forces a theme, which is handy for screenshots.
 
 The landing page's matrix and its three counters are computed from the judge outputs. Its other charts (confidentiality,
-honeypot, the trilemma-move counts and the Fig. 3 reasoning ladder) show the paper's numbers, which are produced by the
+excuse, the trilemma-move counts and the Fig. 6 reasoning ladder) show the paper's numbers, which are produced by the
 analysis scripts in TRILEMMA-ENV.
